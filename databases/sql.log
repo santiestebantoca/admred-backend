@@ -1,0 +1,18 @@
+timestamp: 2021-12-05T15:27:26.313051
+CREATE TABLE `area`(
+    `id` INT AUTO_INCREMENT NOT NULL,
+    `nombre` VARCHAR(512) NOT NULL,
+    `padre` INT  , INDEX `padre__idx` (`padre`), FOREIGN KEY (`padre`) REFERENCES `area` (`id`) ON DELETE NO ACTION,
+    `nivel` INT  , INDEX `nivel__idx` (`nivel`), FOREIGN KEY (`nivel`) REFERENCES `nivel` (`id`) ON DELETE CASCADE,
+    `rol_key` VARCHAR(512),
+    PRIMARY KEY (`id`)
+) ENGINE=InnoDB CHARACTER SET utf8;
+timestamp: 2021-12-05T15:27:26.513171
+CREATE TABLE `area`(
+    `id` INT AUTO_INCREMENT NOT NULL,
+    `nombre` VARCHAR(512) NOT NULL,
+    `padre` INT  , INDEX `padre__idx` (`padre`), FOREIGN KEY (`padre`) REFERENCES `area` (`id`) ON DELETE NO ACTION,
+    `nivel` INT  , INDEX `nivel__idx` (`nivel`), FOREIGN KEY (`nivel`) REFERENCES `nivel` (`id`) ON DELETE CASCADE,
+    `rol_key` VARCHAR(512),
+    PRIMARY KEY (`id`)
+) ENGINE=InnoDB CHARACTER SET utf8;
