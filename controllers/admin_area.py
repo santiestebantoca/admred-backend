@@ -121,3 +121,21 @@ class Validate:
             return fn(*k, **kw)
 
         return run
+
+
+"""
+Antes:
+1. Verificar que las areas de provision esten bien asociadas a su padre correspondiente.
+2. Marcar las 16 areas de provision con una X.
+3. Ir al URL: /admred/admin_area/integracion_areas
+4. Verificar que las areas de provision hayan sido eliminadas y los usuarios y solicitudes reasignadas.
+"""
+def integracion_areas():
+    areas_provision = db(db.area.rol_key == 'X').select()
+    for area in areas_provision:
+        db(db.auth_user.area == area.id).update(area=area.padre)
+        db(db.solicitud.origen == area.id).update(origen=area.padre)
+        db(db.solicitud.destino == area.id).update(destino=area.padre)
+        db(db.area.id == area.id).delete()
+
+    return "Integración de áreas de provisión a áreas de administración finalizada."
