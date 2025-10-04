@@ -166,7 +166,7 @@ def solicitud():
                 db.solicitudes.destino_id,
             ]
             res = db(db.solicitud.id == id).select(*fields).first()
-            Validate.get(solicitud=res)
+            # Validate.get(solicitud=res)
             res["padre"] = db(db.solicitudes.id == res.padre).select(*fields2).first()
             res["hijos"] = db(db.solicitudes.padre_id == id).select(*fields2).as_list()
             res["remitente"] = db.usuario(res.remitente)
