@@ -126,7 +126,7 @@ class Validate:
 """
 Antes:
 1. Verificar que las areas de provision esten bien asociadas a su padre correspondiente.
-2. Marcar las 16 areas de provision con una X.
+2. Marcar las 15 (excluyendo La Habana) areas de provision con una X.
 3. Ir al URL: /admred/admin_area/integracion_areas
 4. Verificar que las areas de provision hayan sido eliminadas y los usuarios y solicitudes reasignadas.
 """
