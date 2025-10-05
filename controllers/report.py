@@ -7,8 +7,8 @@ def buscar():
 
     @auth.requires_login()
     def GET(*args, **vars):
-        res = db(db.solicitud.codigo == vars['codigo']).select(
-            db.solicitud.id, db.solicitud.codigo).first()
+        res = db(db.solicitud.codigo.contains(vars['codigo'])).select(
+            db.solicitud.id, db.solicitud.codigo, limitby=(0, 10))
         return response.json(res or {})
 
     def OPTIONS(*args, **vars):
