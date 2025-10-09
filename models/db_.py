@@ -28,6 +28,7 @@ tabla('adjunto',
 
 tabla('nivel',
       Field('nombre', notnull=True),
+      Field('descripcion'),
       format=' %(nombre)s')
 
 tabla('area',

@@ -10,8 +10,14 @@ def destinos():
 
     @auth.requires_login()
     def GET(*args, **vars):
+        """
+        db.area.id == 2, es la Dirección de Administración de la Red
+        db.area.nivel == 2, es el nivel de Direcciones y Grupos (VPOR)
+        db.area.padre == area.id, son las áreas hijas del área
+        db.area.id == area.padre, es el padre del área
+        """
         area = db.area(auth.user.area)
-        if area.rol_key in ["AR", "DAR"]:  # Administración
+        if area.rol_key == "AR":  # Dirección de Administración y sus Departamentos
             q = db.area
         elif area.nivel == 1:  # 1 Vicepresidencia
             q = db.area.id == 2
@@ -20,8 +26,13 @@ def destinos():
             q |= db.area.padre == area.id
         elif area.nivel == 3:  # 3 Departamentos
             q = db.area.id == area.padre
-        elif area.nivel >= 4:  # 4 Áreas externas
+        elif area.nivel in [4, 5]:  # 4, 5 Áreas externas
             q = db.area.id == 2
+        elif area.nivel == 6:  # 6 Grupos de Administración de los Territorios
+            q = db.area.id == 2
+            q |= db.area.padre == area.id
+        elif area.nivel == 7:  # 7 Áreas de los Territorios
+            q = db.area.id == area.padre
         return response.json(db(q).select(db.area.id, db.area.nombre))
 
     def OPTIONS(*args, **vars):
