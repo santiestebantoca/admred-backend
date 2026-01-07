@@ -16,3 +16,36 @@ CREATE TABLE `area`(
     `rol_key` VARCHAR(512),
     PRIMARY KEY (`id`)
 ) ENGINE=InnoDB CHARACTER SET utf8;
+timestamp: 2025-11-11T09:55:53.595291
+CREATE TABLE `web2py_session_admred`(
+    `id` INT AUTO_INCREMENT NOT NULL,
+    `locked` CHAR(1),
+    `client_ip` VARCHAR(64),
+    `created_datetime` DATETIME,
+    `modified_datetime` DATETIME,
+    `unique_key` VARCHAR(64),
+    `session_data` LONGBLOB,
+    PRIMARY KEY (`id`)
+) ENGINE=InnoDB CHARACTER SET utf8;
+success!
+timestamp: 2025-11-11T09:55:54.582344
+CREATE TABLE `auth_user`(
+    `id` INT AUTO_INCREMENT NOT NULL,
+    `first_name` VARCHAR(128),
+    `last_name` VARCHAR(128),
+    `email` VARCHAR(512),
+    `username` VARCHAR(128),
+    `password` VARCHAR(512),
+    `registration_key` VARCHAR(512),
+    `reset_password_key` VARCHAR(512),
+    `registration_id` VARCHAR(512),
+    `area` INT  , INDEX `area__idx` (`area`), FOREIGN KEY (`area`) REFERENCES `area` (`id`) ON DELETE CASCADE,
+    `fijo` VARCHAR(512),
+    `movil` VARCHAR(512),
+    `is_active` CHAR(1),
+    `created_on` DATETIME,
+    `created_by` INT  , INDEX `created_by__idx` (`created_by`), FOREIGN KEY (`created_by`) REFERENCES `auth_user` (`id`) ON DELETE CASCADE,
+    `modified_on` DATETIME,
+    `modified_by` INT  , INDEX `modified_by__idx` (`modified_by`), FOREIGN KEY (`modified_by`) REFERENCES `auth_user` (`id`) ON DELETE CASCADE,
+    PRIMARY KEY (`id`)
+) ENGINE=InnoDB CHARACTER SET utf8;

@@ -35,12 +35,8 @@ def smstest():
 
 def emailtest():
     return mail.send(
-        to=[auth.user.email],
+        # to=[auth.user.email],
+        to=request.args(0),
         subject='Correo de prueba de ADM Red',
         message='Correo de prueba de ADM Red'
     )  # True or False
-
-
-def user():
-    # to use emailtest without previous login
-    return dict(form=auth())

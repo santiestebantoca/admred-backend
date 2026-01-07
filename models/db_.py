@@ -19,17 +19,20 @@ tabla('upload',
       Field('filename', required=True, notnull=True),
       Field('filemodified', required=True, notnull=True),
       Field('filesize', 'integer', required=True, notnull=True),
-      Field.Virtual('file', lambda r: url + '/' + r.upload.upload))
+      Field.Virtual('file', lambda r: url + '/' + r.upload.upload),
+      migrate=False)
 
 tabla('adjunto',
       Field('solicitud_id', 'reference solicitud'),
       Field('upload_id', 'reference upload'),
-      Field('tipo', 'integer'))
+      Field('tipo', 'integer'),
+      migrate=False)
 
 tabla('nivel',
       Field('nombre', notnull=True),
       Field('descripcion'),
-      format=' %(nombre)s')
+      format=' %(nombre)s',
+      migrate=False)
 
 tabla('area',
       Field('nombre', notnull=True),
@@ -37,18 +40,21 @@ tabla('area',
       Field('nivel', 'reference nivel'),
       Field('rol_key'),
       auth.signature,
-      format=' %(nombre)s')
+      format=' %(nombre)s',
+      migrate=False)
 
 tabla('tipo',
       Field('nombre', notnull=True),
       Field('descripcion'),
       auth.signature,
-      format=' %(nombre)s')
+      format=' %(nombre)s',
+      migrate=False)
 
 tabla('estado',
       Field('nombre', notnull=True),
       Field('descripcion', notnull=True),
-      format=' %(nombre)s')
+      format=' %(nombre)s',
+      migrate=False)
 
 tabla('solicitud',
       Field('codigo', unique=True, length=9),
@@ -70,14 +76,16 @@ tabla('solicitud',
       Field('supervisor', 'reference auth_user'),
       Field('tramitador_en', 'datetime'),
       Field('padre', 'reference solicitud'),
-      Field('cumplir_en', 'datetime'))
+      Field('cumplir_en', 'datetime'),
+      migrate=False)
 
 tabla('bitacora',
       Field('solicitud', 'reference solicitud'),
       Field('fecha', 'datetime', default=request.now),
       Field('accion'),
       Field('por', 'reference auth_user', default=auth.user_id),
-      Field('argumentos'))
+      Field('argumentos'),
+      migrate=False)
 
 tabla('nota',
       Field('solicitud', 'reference solicitud'),
@@ -85,8 +93,8 @@ tabla('nota',
       Field('tramitador', 'reference auth_user'),
       Field('supervisor', 'reference auth_user'),
       Field('texto', 'text'),
-      Field('evento')
-      )
+      Field('evento'),
+      migrate=False)
 
 """ Tables relationships"""
 db.auth_user.area.requires = IS_IN_DB(db, 'area.id', ' %(nombre)s')

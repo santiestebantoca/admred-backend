@@ -24,6 +24,8 @@ db = DAL(
     lazy_tables=True  # Big perfomence boost offered by web2py
 )
 
+session.connect(request, response, db, masterapp=None)
+
 # -------------------------------------------------------------------------
 # choose a style for forms
 # -------------------------------------------------------------------------
