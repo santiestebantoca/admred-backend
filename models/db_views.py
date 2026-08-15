@@ -55,3 +55,17 @@ tabla('adjuntos',
       Field('filemodified'),
       Field.Virtual('file', lambda r: url + '/' + r.adjuntos.upload),
       migrate=False)
+
+tabla('vw_solicitudes_a_provision',
+      Field('codigo'),
+      Field('origen'),
+      Field('objetivo'),
+      Field('solicitado_en'),
+      Field('terminado_en'),
+      Field('h_codigo'),
+      Field('h_destino'),
+      Field('h_objetivo'),
+      Field('h_solicitado_en'),
+      Field('h_terminado_en'),
+      migrate=False
+)

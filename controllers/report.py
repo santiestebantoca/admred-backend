@@ -370,6 +370,42 @@ def consultadas():
     return locals()
 
 
+@request.restful()
+def provision():
+
+    @Validate.auth_from_AR
+    def GET(desde, hasta):
+        """
+        [ago 10, 2026] by Raida:
+        Se necesita un reporte crudo de las solicitudes al Departamento
+        de Provisión y sus hijas para análisis de tiempos excedidos.
+        `admred`.`solicitud`.`destino` = 47
+        (Departamento de Planificación y Provisión)
+        """
+        fields = [
+            db.vw_solicitudes_a_provision.codigo,
+            db.vw_solicitudes_a_provision.origen,
+            db.vw_solicitudes_a_provision.objetivo,
+            db.vw_solicitudes_a_provision.solicitado_en,
+            db.vw_solicitudes_a_provision.terminado_en,
+            db.vw_solicitudes_a_provision.h_codigo,
+            db.vw_solicitudes_a_provision.h_destino,
+            db.vw_solicitudes_a_provision.h_objetivo,
+            db.vw_solicitudes_a_provision.h_solicitado_en,
+            db.vw_solicitudes_a_provision.h_terminado_en,
+        ]
+        q = db.vw_solicitudes_a_provision.solicitado_en >= desde
+        q &= db.vw_solicitudes_a_provision.solicitado_en <= hasta + ' 23:59:59'
+        res = db(q).select(*fields, orderby=db.vw_solicitudes_a_provision.codigo)
+        return response.json(res)
+
+    def OPTIONS(*args, **vars):
+        raise HTTP(200, **headers)
+
+    return locals()
+
+
+
 class Validate:
     """
     Validate authorization for methods, based on user administration scope (user area role_key)
