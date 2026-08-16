@@ -1,11 +1,9 @@
 # coding: utf8
 
-tabla = tabla
 url = URL('default', 'download', scheme=True,
           host=True, port=request.env.server_port)
 
-
-tabla('usuario',
+tabla('vw_usuario',
       Field('name'),
       Field('username'),
       Field('email'),

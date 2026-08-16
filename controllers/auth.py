@@ -7,17 +7,20 @@ def login():
     def GET():
         return response.json(user())
 
-    def POST(*args, **vars):
+    def POST(username, password):
         if auth.user:
             auth.log_event(auth.messages['logout_log'], auth.user)
             auth.logout_bare()
-        res = login_bare(vars['username'], vars['password'])
-        res.update(user=user())
+        login_bare(username, password)
+        res = user()
+        if not res:
+            response.status = 422
+            return response.json({})
         return response.json(res)
 
     def DELETE():
         if auth.user:
-            auth.log_event(auth.messages['logout_log'], auth.user)
+            auth.log_event(auth.messages['logout_log'], auth.user, origin='auth')
             auth.logout_bare()
         return response.json(user())
 
@@ -103,9 +106,9 @@ def login_bare(username, password):
 
 @request.restful()
 def impersonate():
-    def POST(*args, **vars):
+    def POST(user_id=0):
         if can_impersonate():
-            auth.impersonate(request.args(0) or '0')
+            auth.impersonate(user_id)
         else:
             auth.impersonate('0')
         return response.json(user())
@@ -118,12 +121,18 @@ def impersonate():
 
 @request.restful()
 def users():
-    def GET(*args, **vars):
-        if 'name' in vars:
-            q = db.usuario.name.contains(vars['name'])
-            res = db(q).select(limitby=(0, 10))
-        else:
-            res = db(db.usuario).select()
+    def GET(search=None):
+        fds = [
+            db.vw_usuario.id,
+            db.vw_usuario.name,
+            db.vw_usuario.username,
+        ]
+        args = dict(distinct=True, orderby=~db.vw_usuario.name)
+        query = db.vw_usuario.id > 0
+        query &= ((db.vw_usuario.registration_key == None) | (db.vw_usuario.registration_key == ''))
+        if search:
+            query &= db.vw_usuario.name.contains(search)
+        res = db(query).select(*fds, **args)
         return response.json(res)
 
     def OPTIONS(*args, **vars):
@@ -133,5 +142,4 @@ def users():
 
 
 def can_impersonate():
-    # Allowed now: Jorge Lino, Ignacio, Julito and Aldo
     return auth.user_id in [1, 2, 235, 4]

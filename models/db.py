@@ -4,15 +4,8 @@ from gluon.contrib.login_methods.ldap_auth import ldap_auth
 from gluon.contrib.appconfig import AppConfig
 from gluon.tools import Auth
 
-# -------------------------------------------------------------------------
-# if SSL/HTTPS is properly configured and you want all HTTP requests to
-# be redirected to HTTPS, uncomment the line below:
-# -------------------------------------------------------------------------
 request.requires_https()
 
-# -------------------------------------------------------------------------
-# once in production, remove reload=True to gain full speed
-# -------------------------------------------------------------------------
 configuration = AppConfig(reload=False)
 
 db = DAL(
@@ -25,23 +18,6 @@ db = DAL(
 )
 
 session.connect(request, response, db, masterapp=None)
-
-# -------------------------------------------------------------------------
-# choose a style for forms
-# -------------------------------------------------------------------------
-# response.formstyle = 'bootstrap4_inline'
-response.form_label_separator = ''
-
-# -------------------------------------------------------------------------
-# (optional) optimize handling of static files
-# -------------------------------------------------------------------------
-# response.optimize_css = 'concat,minify,inline'
-# response.optimize_js = 'concat,minify,inline'
-
-# -------------------------------------------------------------------------
-# (optional) static assets folder versioning
-# -------------------------------------------------------------------------
-response.static_version = '1.9.0'
 
 # host names must be a list of allowed host names (glob syntax allowed)
 # auth = Auth(db, host_names=configuration.get('host.names'))
@@ -56,7 +32,7 @@ auth.settings.extra_fields['auth_user'] = [
     Field('movil'),
     auth.signature
 ]
-auth.define_tables(username=True, signature=False)
+auth.define_tables(username=True)
 
 # -------------------------------------------------------------------------
 # configure email
@@ -82,29 +58,21 @@ auth.settings.actions_disabled = [
 ]
 auth.settings.expiration = 30 * 60  # 30 min
 
-# -------------------------------------------------------------------------
-# For those using legacy https, the use of http is forced
-# -------------------------------------------------------------------------
-# auth.settings.login_onaccept = [lambda form: redirect('http://192.168.90.169', client_side=True)]
-
-
-# -------------------------------------------------------------------------
-# read more at http://dev.w3.org/html5/markup/meta.name.html
-# -------------------------------------------------------------------------
-response.meta.author = configuration.get('app.author')
-response.meta.description = configuration.get('app.description')
-response.meta.keywords = configuration.get('app.keywords')
-response.meta.generator = configuration.get('app.generator')
-response.show_toolbar = configuration.get('app.toolbar')
-
-
-# ds.etecsa.cu <-> 192.168.91.114
-auth.settings.login_methods += [
+# lds.etecsa.cu
+auth.settings.login_methods.append(
     ldap_auth(
-        server='192.168.91.114',
-        base_dn='ou=etecsa.cu,ou=People,dc=etecsa,dc=cu'
-    )
-]
+        server='172.29.30.200',
+        base_dn='ou=etecsa.cu,ou=People,dc=etecsa,dc=cu',
+        secure=True,
+        self_signed_certificate=True,
+        # tls=True,
+        logging_level='debug')
+)
+
+# after defining tables, uncomment below to enable auditing
+# auth.enable_record_versioning(db)
+
+tabla = db.define_table
 
 T.force('es')
 
@@ -121,10 +89,6 @@ We force X-Requested-With: XMLHttpRequest in client request,
 that is the way web2py recognizes the ajax request.
 """
 
-if request.ajax:  # request.ajax checks for header X-Requested-With = XMLHttpRequest
-    def resp403(): raise HTTP(403, 'Not authorized')
-    auth.settings.on_failed_authorization = resp403
-
 # frontURL = configuration.get('front.url', request.env.http_origin)
 frontURL = request.env.http_origin
 
@@ -139,3 +103,17 @@ headers = {
     # 24hrs  // cache for Allow Header & Allow Methods
     'Access-Control-Max-Age': 86400,
 }
+
+# response.headers.update(**headers)
+
+if request.ajax:
+
+    def resp401():
+        raise HTTP(401, **headers)
+
+
+    def resp403():
+        raise HTTP(403, **headers)
+
+    auth.settings.on_failed_authentication = resp401
+    auth.settings.on_failed_authorization = resp403

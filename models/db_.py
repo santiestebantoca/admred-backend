@@ -1,6 +1,5 @@
 # coding: utf8
 
-tabla = db.define_table
 url = URL('default', 'download', scheme=True,
           host=True, port=request.env.server_port)
 
