@@ -46,9 +46,9 @@ def tramitadores():
 
     @auth.requires_login()
     def GET(*args, **vars):
-        q = db.usuario.area_id == auth.user.area
-        q &= (db.usuario.registration_key == None) | (db.usuario.registration_key == "")
-        return response.json(db(q).select(db.usuario.id, db.usuario.name))
+        q = db.vw_usuario.area_id == auth.user.area
+        q &= (db.vw_usuario.registration_key == None) | (db.vw_usuario.registration_key == "")
+        return response.json(db(q).select(db.vw_usuario.id, db.vw_usuario.name))
 
     def OPTIONS(*args, **vars):
         raise HTTP(200, **headers)
@@ -133,7 +133,7 @@ def bitacora():
     def GET(*args, **vars):
         res = db(db.bitacora.solicitud == vars["solicitud"]).select()
         for row in res:
-            row["by"] = db.usuario(row.por).username
+            row["by"] = db.vw_usuario(row.por).username
         return response.json(res)
 
     def OPTIONS(*args, **vars):
@@ -180,9 +180,9 @@ def solicitud():
             # Validate.get(solicitud=res)
             res["padre"] = db(db.solicitudes.id == res.padre).select(*fields2).first()
             res["hijos"] = db(db.solicitudes.padre_id == id).select(*fields2).as_list()
-            res["remitente"] = db.usuario(res.remitente)
-            res["supervisor"] = db.usuario(res.supervisor)
-            res["tramitador"] = db.usuario(res.tramitador)
+            res["remitente"] = db.vw_usuario(res.remitente)
+            res["supervisor"] = db.vw_usuario(res.supervisor)
+            res["tramitador"] = db.vw_usuario(res.tramitador)
             res["origen"] = db.area(res.origen)
             res["destino"] = db.area(res.destino)
             res["tipo"] = db.tipo(res.tipo)
@@ -294,8 +294,8 @@ def nota():
     def GET(*args, **vars):
         res = db(db.nota.solicitud == vars["solicitud"]).select(orderby=db.nota.id)
         for row in res:
-            row["supervisor"] = db.usuario(row.supervisor)
-            row["tramitador"] = db.usuario(row.tramitador)
+            row["supervisor"] = db.vw_usuario(row.supervisor)
+            row["tramitador"] = db.vw_usuario(row.tramitador)
         return response.json(res)
 
     @auth.requires_login()

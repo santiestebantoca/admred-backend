@@ -17,29 +17,29 @@ def users(db, auth, vars):
     """
     left = False
     fds = [
-        db.usuario.id,
-        db.usuario.name,
-        db.usuario.username,
-        db.usuario.registration_key,
+        db.vw_usuario.id,
+        db.vw_usuario.name,
+        db.vw_usuario.username,
+        db.vw_usuario.registration_key,
     ]
-    args = dict(distinct=True, orderby=~db.usuario.id)
+    args = dict(distinct=True, orderby=~db.vw_usuario.id)
     vars.limit and args.update(limitby=limitby(vars))
-    q = db.usuario.id > 0
+    q = db.vw_usuario.id > 0
     if vars.name:
-        q &= db.usuario.name.contains(vars.name)
+        q &= db.vw_usuario.name.contains(vars.name)
     # if vars.no_area:
-    #     q &= db.usuario.area_id == None
+    #     q &= db.vw_usuario.area_id == None
     elif vars.area:
-        q &= db.usuario.area_id == vars.area
+        q &= db.vw_usuario.area_id == vars.area
     if vars.blocked:
-        q &= db.usuario.registration_key == 'blocked'
+        q &= db.vw_usuario.registration_key == 'blocked'
     if vars.group:
-        q &= db.usuario.id == db.auth_membership.user_id
+        q &= db.vw_usuario.id == db.auth_membership.user_id
         q &= db.auth_membership.group_id == vars.group
     # administrador no AR::
     if db.area(auth.user.area).rol_key != 'AR':
-        q &= db.usuario.area_id == auth.user.area
-        q |= (db.usuario.area_id == None) & (db.usuario.created_by == auth.user_id)
+        q &= db.vw_usuario.area_id == auth.user.area
+        q |= (db.vw_usuario.area_id == None) & (db.vw_usuario.created_by == auth.user_id)
     # return::
     sql = db(q)._select(*fds, left=left, **args)
     rows = db.executesql(sql)

@@ -251,10 +251,10 @@ def person():
 
     @auth.requires_login()
     def GET(*args, **vars):
-        q = db.usuario.area_id == auth.user.area
-        q &= ((db.usuario.registration_key == None) |
-              (db.usuario.registration_key == ''))
-        res = db(q).select(db.usuario.id, db.usuario.name)
+        q = db.vw_usuario.area_id == auth.user.area
+        q &= ((db.vw_usuario.registration_key == None) |
+              (db.vw_usuario.registration_key == ''))
+        res = db(q).select(db.vw_usuario.id, db.vw_usuario.name)
         return response.json(res)
 
     def OPTIONS(*args, **vars):
