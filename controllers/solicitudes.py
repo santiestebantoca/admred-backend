@@ -2,148 +2,8 @@
 __author__ = "jorge.santiesteban"
 
 
-# Statics for input controls
-
-
 @request.restful()
-def destinos():
-
-    @auth.requires_login()
-    def GET(*args, **vars):
-        """
-        db.area.id == 2, es la Dirección de Administración de la Red
-        db.area.nivel == 2, es el nivel de Direcciones y Grupos (VPOR)
-        db.area.padre == area.id, son las áreas hijas del área
-        db.area.id == area.padre, es el padre del área
-        """
-        area = db.area(auth.user.area)
-        if area.rol_key == "AR":  # Dirección de Administración y sus Departamentos
-            q = db.area
-        elif area.nivel == 1:  # 1 Vicepresidencia
-            q = db.area.id == 2
-        elif area.nivel == 2:  # 2 Direcciones y Grupos
-            q = db.area.nivel == 2
-            q |= db.area.padre == area.id
-        elif area.nivel == 3:  # 3 Departamentos
-            q = db.area.id == area.padre
-        elif area.nivel in [4, 5]:  # 4, 5 Áreas externas
-            q = db.area.id == 2
-        elif area.nivel == 6:  # 6 Grupos de Administración de los Territorios
-            q = db.area.id == 2
-            q |= db.area.padre == area.id
-        elif area.nivel == 7:  # 7 Áreas de los Territorios
-            q = db.area.id == area.padre
-        return response.json(db(q).select(db.area.id, db.area.nombre))
-
-    def OPTIONS(*args, **vars):
-        raise HTTP(200, **headers)
-
-    return locals()
-
-
-@request.restful()
-def tramitadores():
-
-    @auth.requires_login()
-    def GET(*args, **vars):
-        q = db.vw_usuario.area_id == auth.user.area
-        q &= (db.vw_usuario.registration_key == None) | (db.vw_usuario.registration_key == "")
-        return response.json(db(q).select(db.vw_usuario.id, db.vw_usuario.name))
-
-    def OPTIONS(*args, **vars):
-        raise HTTP(200, **headers)
-
-    return locals()
-
-
-@request.restful()
-def tipos():
-
-    @auth.requires_login()
-    def GET(*args, **vars):
-        return response.json(db(db.tipo).select())
-
-    def OPTIONS(*args, **vars):
-        raise HTTP(200, **headers)
-
-    return locals()
-
-
-# Client component custom data interface
-
-
-@request.restful()
-def pending():
-    """
-    cantidad de solicitudes pendientes (recibidas / enviadas)
-    supervisor: todas / especialista: si remitente o tramitador
-    """
-    from applications.admred.modules.db.solicitudes import (
-        solicitudes_recibidas,
-        solicitudes_enviadas,
-    )
-
-    @auth.requires_login()  # it uses auth.user
-    def GET(*args, **vars):
-        def lista_por_asignar():
-            # TODO: or tramitador_rk == 'blocked'
-            if auth.has_membership("supervisor"):
-                q = db.solicitudes.estado_id == 1
-                q &= db.solicitudes.destino_id == auth.user.area
-                sql = db(q)._select(db.solicitudes.id, db.solicitudes.codigo)
-                return db.executesql(sql)
-            else:
-                return []
-
-        def lista_por_responder():
-            q = db.solicitudes.estado_id == 2
-            q &= db.solicitudes.tramitador_id == auth.user_id
-            sql = db(q)._select(db.solicitudes.id, db.solicitudes.codigo)
-            return db.executesql(sql)
-
-        def lista_por_aprobar():
-            q = db.solicitudes.estado_id == 3
-            q &= db.solicitudes.supervisor_id == auth.user_id
-            sql = db(q)._select(db.solicitudes.id, db.solicitudes.codigo)
-            return db.executesql(sql)
-
-        q = db.solicitudes.estado_id != 4
-        recibidas = q & solicitudes_recibidas(auth, db)
-        enviadas = q & solicitudes_enviadas(auth, db)
-        return response.json(
-            dict(
-                incoming=db(recibidas).count(),
-                outgoing=db(enviadas).count(),
-                assign=lista_por_asignar(),
-                reply=lista_por_responder(),
-                approve=lista_por_aprobar(),
-            )
-        )
-
-    def OPTIONS(*args, **vars):
-        raise HTTP(200, **headers)
-
-    return locals()
-
-
-# Dynamic data interfaces
-@request.restful()
-def bitacora():
-
-    def GET(*args, **vars):
-        res = db(db.bitacora.solicitud == vars["solicitud"]).select()
-        for row in res:
-            row["by"] = db.vw_usuario(row.por).username
-        return response.json(res)
-
-    def OPTIONS(*args, **vars):
-        raise HTTP(200, **headers)
-
-    return locals()
-
-
-@request.restful()
-def solicitud():
+def solicitudes():
     @auth.requires_login()  # it uses auth.user
     def GET(id=None, **vars):
         if id:
@@ -195,6 +55,47 @@ def solicitud():
             res["adjuntos_respuesta"] = (
                 db(q & (db.adjuntos.tipo == 2)).select().as_list()
             )
+            # Usuario: roles y permisos contextuales
+            esSupervisorAreaDemandada = auth.has_membership("supervisor") and (res["destino"]["id"] == auth.user.area)
+            esSupervisorSolicitud = res["supervisor"]["id"] == auth.user_id if res["supervisor"] else False
+            esTramitadorSolicitud = res["tramitador"]["id"] == auth.user_id if res["tramitador"] else False
+            esRemitenteSolicitud = res["remitente"]["id"] == auth.user_id if res["remitente"] else False
+            res["permisos"] = {
+                "asignar": (
+                    res["estado"]["id"] < 3  # solicitada, en proceso (asignada)
+                    and esSupervisorAreaDemandada  # puede asignar o reasignar
+                ),
+                "reenviar": ((
+                    res["estado"]["id"] == 2  # en proceso
+                    and esTramitadorSolicitud  # puede reenviar solicitudes a su cargo
+                )
+                or (
+                    res["estado"]["id"] == 1  # solicitada (no asignada)
+                    and esSupervisorAreaDemandada  # puede reenviar (convirtiendose en tramitador) 
+                )),
+                "responder": (
+                    res["estado"]["id"] == 2  # en proceso
+                    and esTramitadorSolicitud  # puede responder solicitudes a su cargo
+                ),
+                "aprobar": (
+                    res["estado"]["id"] == 3  # en evaluacion (respondida)
+                    and esSupervisorSolicitud  # puede aprobar solicitudes a su cargo
+                ),
+                "evaluar": (
+                    res["estado"]["id"] == 4  # terminada
+                    and not res["evaluacion"]  # no evaluada
+                    and esRemitenteSolicitud  # puede evaluar sus solicitudes
+                    # TODO: acotar en tiempo (plazo para evaluar)
+                ),
+                "comentar": (
+                    res["estado"]["id"] < 4  # no terminada
+                    and (  # puede escribir notas estando asociado la solicitud
+                        esSupervisorSolicitud
+                        or esTramitadorSolicitud
+                        or esRemitenteSolicitud
+                    )
+                )
+            }            
 
             return response.json(res)
         else:
@@ -204,7 +105,7 @@ def solicitud():
             return response.json(solicitudes(db, auth, Storage(vars)))
 
     @auth.requires_login()
-    def PUT(id, **vars):  # assign, reply, approve and evaluate
+    def PUT(id, **vars):  # asignar, responder, aprobar and evaluar
         solicitud_id = int(id)
         adjuntos = vars.pop("adjuntos", [])
         q = db.solicitud.id == solicitud_id
@@ -218,7 +119,10 @@ def solicitud():
             vars["tramitador_en"] = request.now
             vars["estado"] = 2
             res = db(q).validate_and_update(**vars)
-            return response.json(res)
+            if (res.errors):
+                response.status = 422
+                return response.json(res.errors)
+            return response.json(res.updated)
         if "observaciones" in vars:
             from applications.admred.modules.db.solicitudes import add_adjuntos
 
@@ -227,7 +131,10 @@ def solicitud():
             vars["respuesta_en"] = request.now
             vars["estado"] = 3
             res = db(q).validate_and_update(**vars)
-            if res.updated:
+            if (res.errors):
+                response.status = 422
+                return response.json(res.errors)
+            elif res.updated:
                 add_adjuntos(db, solicitud_id, adjuntos, 2)
             return response.json(res)
         if "aprobado" in vars:
@@ -239,11 +146,17 @@ def solicitud():
             else:
                 response.callback = "disapprove"
                 res = db(q).validate_and_update(estado=2)
+            if (res.errors):
+                response.status = 422
+                return response.json(res.errors)
             return response.json(res)
         if "evaluacion" in vars:
             Validate.rate(solicitud=db.solicitud(solicitud_id))
             response.callback = "rate"
             res = db(q).validate_and_update(**vars)
+            if (res.errors):
+                response.status = 422
+                return response.json(res.errors)
             return response.json(res)
 
     @auth.requires_login()
@@ -269,54 +182,20 @@ def solicitud():
         vars["remitente"] = auth.user_id
         vars["estado"] = 1
         res = db.solicitud.validate_and_insert(**vars)
-        if res.id:
-            add_adjuntos(db, res.id, adjuntos, 1)
-            if "padre" in vars:
-                response.callback = False  # this action is invisible to callbacks
-                q = db.solicitud.id == vars["padre"]
-                q &= db.solicitud.estado == 1
-                db(q).update(
-                    supervisor=auth.user_id,
-                    tramitador=auth.user_id,
-                    tramitador_en=request.now,
-                    estado=2,
-                )
-        return response.json(res)
-
-    def OPTIONS(*args, **vars):
-        raise HTTP(200, **headers)
-
-    return locals()
-
-
-@request.restful()
-def nota():
-    def GET(*args, **vars):
-        res = db(db.nota.solicitud == vars["solicitud"]).select(orderby=db.nota.id)
-        for row in res:
-            row["supervisor"] = db.vw_usuario(row.supervisor)
-            row["tramitador"] = db.vw_usuario(row.tramitador)
-        return response.json(res)
-
-    @auth.requires_login()
-    def POST(*args, **vars):
-        # new [nov 16, 2021] by Mabel, note writer can be 'remitente' also.
-        # The solution in this case was to leave empty tramitador and supervisor fields
-        # It implies changes in:
-        # 1. controller validation.
-        # 2. Item view to show action to user
-        # 3. Note view to let remitente write down a note, and to show note correctly.
-        # -------------------------
-        # new [feb 15, 2022] by Aldo: 'supervisor' can also create a note
-
-        solicitud = db.solicitud(int(vars["solicitud"]))
-        Validate.nota(solicitud=solicitud)
-        if solicitud.tramitador == auth.user_id:
-            vars["tramitador"] = auth.user_id
-        elif solicitud.supervisor == auth.user_id:
-            vars["supervisor"] = auth.user_id
-
-        res = db.nota.validate_and_insert(**vars)
+        if (res.errors):
+            response.status = 422
+            return response.json(res.errors)
+        add_adjuntos(db, res.id, adjuntos, 1)
+        if "padre" in vars:
+            response.callback = False  # this action is invisible to callbacks
+            q = db.solicitud.id == vars["padre"]
+            q &= db.solicitud.estado == 1
+            db(q).update(
+                supervisor=auth.user_id,
+                tramitador=auth.user_id,
+                tramitador_en=request.now,
+                estado=2,
+            )
         return response.json(res)
 
     def OPTIONS(*args, **vars):
@@ -377,17 +256,4 @@ class Validate:
         User has to be the 'remitente' of this 'solicitud'
         """
         if not (auth.user_id == solicitud.remitente):
-            raise HTTP(403, "Forbidden")
-
-    @staticmethod
-    def nota(solicitud):
-        """
-        User has to be the 'tramitador' of this 'solicitud'
-        new [nov 16, 2021] by Mabel: 'remitente' can also create a note
-        new [feb 15, 2022] by Aldo: 'supervisor' can also create a note
-        """
-        if not (
-            auth.user_id
-            in [solicitud.tramitador, solicitud.remitente, solicitud.supervisor]
-        ):
             raise HTTP(403, "Forbidden")

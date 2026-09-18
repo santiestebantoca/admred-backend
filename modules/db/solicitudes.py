@@ -46,7 +46,7 @@ def terminado_en_periodo(db, period):
         month = i_month if i_month > 0 else i_month + 12
         year = start.year if i_month > 0 else start.year - 1
         start = date(year, month, start.day)
-    else:
+    else:  # period == 1 or period == None
         start -= timedelta(days=14)
     return db.solicitudes.terminado_en > start
 
@@ -82,8 +82,8 @@ def solicitudes(db, auth, vars):
     elif vars.state == "terminadas":
         q &= db.solicitudes.estado_id == 4
         q &= terminado_en_periodo(db, vars.period)
-    if vars.stateId:
-        q &= db.solicitudes.estado_id == vars.stateId
+    if vars.status:
+        q &= db.solicitudes.estado_id == vars.status
     if vars.codigo:
         q &= db.solicitudes.codigo.contains(vars.codigo)
     if vars.objetivo:
@@ -95,7 +95,7 @@ def solicitudes(db, auth, vars):
     # Search in fields
     if vars.search:
         qor = None
-        for field in vars.headers.split(","):
+        for field in vars.search_in:
             if qor:
                 qor |= db.solicitudes[field].contains(vars.search)
             else:

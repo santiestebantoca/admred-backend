@@ -3,7 +3,7 @@ __author__ = 'jorge.santiesteban'
 
 
 @request.restful()
-def upload():
+def uploads():
 
     def GET(id=None, solicitud_id=None, tipo=1):
         if (id):
@@ -17,7 +17,11 @@ def upload():
 
     def POST(*args, **vars):
         res = db.upload.validate_and_insert(**vars)
-        return response.json(res)
+        if (res.errors):
+            response.status = 422
+            return response.json(res.errors)
+        upload = db.upload(res.id)
+        return response.json(upload)
 
     def DELETE(id, **vars):
         res = 0

@@ -57,10 +57,11 @@ def ws_send(data):
 
 
 def nota_insert(f, i):
-    ws_send({
-        'table': 'nota',
-        'solicitud': int(f['solicitud'])
-    })
+    pass
+    # ws_send({
+    #     'table': 'nota',
+    #     'solicitud': int(f['solicitud'])
+    # })
 
 
 db.nota._after_insert.append(nota_insert)
@@ -71,15 +72,15 @@ def solicitud_insert(f, i):
         db.bitacora.insert(solicitud=f['padre'], accion='reenviada',
                            argumentos='generó la solicitud ' + f['codigo'])
     db.bitacora.insert(solicitud=i, accion='creada')
-    ws_send({
-        'table': 'solicitud',
-        'type': 'create',
-        'action': 'create',
-        'id': i,
-        'origen': f['origen'],
-        'remitente': f['remitente'],
-        'destino': f['destino']
-    })
+    # ws_send({
+    #     'table': 'solicitud',
+    #     'type': 'create',
+    #     'action': 'create',
+    #     'id': i,
+    #     'origen': f['origen'],
+    #     'remitente': f['remitente'],
+    #     'destino': f['destino']
+    # })
     q = db.auth_user.area == f['destino']
     q &= db.auth_membership.group_id == 2  # supervisor
     join = db.auth_membership.on(db.auth_user.id == db.auth_membership.user_id)
@@ -105,16 +106,16 @@ def solicitud_update(s, f):
     if not response.callback:
         return
     updated = s.select().first()
-    ws_send({
-        'table': 'solicitud',
-        'type': 'update',
-        'action': response.callback,
-        'id': updated.id,
-        'origen': updated.origen,
-        'remitente': updated.remitente,
-        'destino': updated.destino,
-        'tramitador': updated.tramitador
-    })
+    # ws_send({
+    #     'table': 'solicitud',
+    #     'type': 'update',
+    #     'action': response.callback,
+    #     'id': updated.id,
+    #     'origen': updated.origen,
+    #     'remitente': updated.remitente,
+    #     'destino': updated.destino,
+    #     'tramitador': updated.tramitador
+    # })
     title = titles[response.callback] % updated
     message = messages[response.callback] % updated
     if response.callback == 'assign':  # send notification via SMS / future: a smart function
@@ -161,10 +162,11 @@ db.solicitud._after_update.append(solicitud_update)
 
 
 def bitacora_insert(f, i):
-    ws_send({
-        'table': 'bitacora',
-        'solicitud': int(f['solicitud'])
-    })
+    pass
+    # ws_send({
+    #     'table': 'bitacora',
+    #     'solicitud': int(f['solicitud'])
+    # })
 
 
 db.bitacora._after_insert.append(bitacora_insert)

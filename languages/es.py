@@ -2,6 +2,7 @@
 {
 '%Y-%m-%d %H:%M:%S': '%Y-%m-%d %H:%M:%S',
 'E-mail': 'E-mail',
+'Enter a value': 'Enter a value',
 'First name': 'First name',
 'Insufficient privileges': 'Insufficient privileges',
 'Last name': 'Last name',
