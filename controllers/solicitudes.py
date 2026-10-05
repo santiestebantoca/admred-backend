@@ -135,6 +135,16 @@ def solicitudes():
                 response.status = 422
                 return response.json(res.errors)
             elif res.updated:
+                """
+                Elimina los adjuntos heredados que no vienen en `adjuntos`
+                eliminando su upload. Es seguro porque el upload de la respuesta
+                no se comparte con otra solicitud. 
+                """
+                
+                q = db.adjunto.solicitud_id == solicitud_id
+                q &= db.adjunto.tipo == 2
+                q &= ~db.adjunto.upload_id.belongs(adjuntos)
+                db(db.upload.id.belongs(db(q)._select(db.adjunto.upload_id))).delete()
                 add_adjuntos(db, solicitud_id, adjuntos, 2)
             return response.json(res)
         if "aprobado" in vars:

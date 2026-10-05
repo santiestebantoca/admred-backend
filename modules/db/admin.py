@@ -44,7 +44,7 @@ def users(db, auth, vars):
     sql = db(q)._select(*fds, left=left, **args)
     rows = db.executesql(sql)
     sql = db(q)._select(*fds, left=left).split(' FROM ', 1)
-    sql = 'SELECT COUNT(DISTINCT usuario.id) FROM ' + sql[1]
+    sql = 'SELECT COUNT(DISTINCT vw_usuario.id) FROM ' + sql[1]
     count = db.executesql(sql)[0][0]
     return dict(data=rows, total=count)
 

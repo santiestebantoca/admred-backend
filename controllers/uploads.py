@@ -23,10 +23,19 @@ def uploads():
         upload = db.upload(res.id)
         return response.json(upload)
 
-    def DELETE(id, **vars):
-        res = 0
-        if db(db.adjunto.upload_id == id).isempty():
-            res = db(db.upload.id == id).delete()
+    def DELETE(id):
+        """
+        Cuando se está creando una solicitud o una respuesta, el archivo que se carga
+        se puede eliminar. En ese caso es seguro eliminarlo: no está compartido con 
+        otra solicitud y no es un adjunto aún (no se ha creado la relación).
+        Casos parecidos de interacción del usuario:
+        Cuando se está reenviando una solicitud se puede eliminar el adjunto heredado;
+        en este caso no se elimina el archivo cargado, solo que no se asocia a la solicitud.
+        Cuando se está reeditando una respuesta se puede eliminar un adjunto heredado;
+        en este caso sí se elimina el archivo cargado (se meneja en el UPDATE de la solicitud).
+        """
+        
+        res = db(db.upload.id == id).delete()
         return response.json(res)
 
     def OPTIONS(*args, **vars):
