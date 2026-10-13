@@ -30,6 +30,8 @@ tabla('adjunto',
 tabla('nivel',
       Field('nombre', notnull=True),
       Field('descripcion'),
+      Field('padre_id', 'reference nivel'),
+      Field('alcance'),
       format=' %(nombre)s',
       migrate=False)
 

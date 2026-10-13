@@ -2,11 +2,6 @@
 __author__ = "jorge.santiesteban"
 
 
-def limitby(vars):
-    min, max = vars.limit.split(",")
-    return (int(min), int(max))
-
-
 def codigo(db):
     """
     `codigo` is a db view
@@ -71,7 +66,6 @@ def solicitudes(db, auth, vars):
         db.solicitudes.padre_id
     ]
     args = dict(distinct=True, orderby=~db.solicitudes.id)
-    vars.limit and args.update(limitby=limitby(vars))
     q = db.solicitudes.id > 0
     if vars.tray == "recibidas":
         q = solicitudes_recibidas(auth, db)

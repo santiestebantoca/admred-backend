@@ -48,15 +48,7 @@ def destinos():
             
         if search:
             q &= db.area.nombre.contains(search)
-        
-        # return::
-        # sql = db(q)._select(*fds, left=left, **args)
-        # rows = db.executesql(sql)
-        # sql = db(q)._select(*fds, left=left).split(" FROM ", 1)
-        # sql = "SELECT COUNT(DISTINCT solicitudes.id) FROM " + sql[1]
-        # count = db.executesql(sql)[0][0]
-        # return dict(data=rows, total=count)    
-            
+             
         res = db(q).select(*fds, left=left, **args)
         return response.json(res)
 

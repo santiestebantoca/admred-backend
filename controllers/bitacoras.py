@@ -6,9 +6,8 @@ __author__ = "jorge.santiesteban"
 def bitacoras():
 
     def GET(solicitudId):
+        db.bitacora.by = Field.Virtual(lambda row: db.vw_usuario(row.bitacora.por))
         res = db(db.bitacora.solicitud == solicitudId).select()
-        for row in res:
-            row["by"] = db.vw_usuario(row.por)
         return response.json(res)
 
     def OPTIONS(*args, **vars):

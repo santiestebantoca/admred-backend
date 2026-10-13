@@ -5,9 +5,6 @@ __author__ = "jorge.santiesteban"
 @request.restful()
 def notas():
     def GET(solicitudId):
-        def get_usuario(id):
-            return db(db.vw_usuario.id == id).select(db.vw_usuario.name).first()
-        
         fds = [
             db.nota.id,
             db.nota.fecha,
@@ -21,17 +18,17 @@ def notas():
         res = db(db.nota.solicitud == solicitudId).select(*fds, **args)
         for row in res:
             if row.tramitador:
-                row["autor"] = get_usuario(row.tramitador)
-                row["como"] = "tramitador"
+                row.autor = db.vw_usuario(row.tramitador)
+                row.como = "tramitador"
             elif row.supervisor:
-                row["autor"] = get_usuario(row.supervisor)
-                row["como"] = "supervisor"
+                row.autor = db.vw_usuario(row.supervisor)
+                row.como = "supervisor"
             else:
                 remitente_id = db.solicitud(solicitudId).remitente
-                row["autor"] = get_usuario(remitente_id)
-                row["como"] = "remitente"
-            del row["tramitador"]
-            del row["supervisor"]
+                row.autor = db.vw_usuario(remitente_id)
+                row.como = "remitente"
+            del row.tramitador
+            del row.supervisor
         return response.json(res)
 
     @auth.requires_login()

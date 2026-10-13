@@ -186,3 +186,50 @@ class Validate:
             return fn(*k, **kw)
 
         return run
+
+
+def limitby(vars):
+    min, max = vars.limit.split(',')
+    return (int(min), int(max))
+
+
+def users(db, auth, vars):
+    """
+    returns::
+    (admin): all rows from `usuario`
+    (admin no AR): rows from `usuario` where
+        (`usuario` with same `area` as auth.user) or \
+        ((`usuario` has no area) and (`usuario` is created by auth.user))
+    """
+    left = False
+    fds = [
+        db.vw_usuario.id,
+        db.vw_usuario.name,
+        db.vw_usuario.username,
+        db.vw_usuario.registration_key,
+    ]
+    args = dict(distinct=True, orderby=~db.vw_usuario.id)
+    vars.limit and args.update(limitby=limitby(vars))
+    q = db.vw_usuario.id > 0
+    if vars.name:
+        q &= db.vw_usuario.name.contains(vars.name)
+    # if vars.no_area:
+    #     q &= db.vw_usuario.area_id == None
+    elif vars.area:
+        q &= db.vw_usuario.area_id == vars.area
+    if vars.blocked:
+        q &= db.vw_usuario.registration_key == 'blocked'
+    if vars.group:
+        q &= db.vw_usuario.id == db.auth_membership.user_id
+        q &= db.auth_membership.group_id == vars.group
+    # administrador no AR::
+    if db.area(auth.user.area).rol_key != 'AR':
+        q &= db.vw_usuario.area_id == auth.user.area
+        q |= (db.vw_usuario.area_id == None) & (db.vw_usuario.created_by == auth.user_id)
+    # return::
+    sql = db(q)._select(*fds, left=left, **args)
+    rows = db.executesql(sql)
+    sql = db(q)._select(*fds, left=left).split(' FROM ', 1)
+    sql = 'SELECT COUNT(DISTINCT vw_usuario.id) FROM ' + sql[1]
+    count = db.executesql(sql)[0][0]
+    return dict(data=rows, total=count)

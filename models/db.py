@@ -34,6 +34,13 @@ auth.settings.extra_fields['auth_user'] = [
 ]
 auth.define_tables(username=True)
 
+db.auth_user.format = '%(first_name)'
+
+db.auth_user.nombre = Field.Method(lambda row:
+    '{first_name} {last_name}'.format(**row.auth_user).strip())
+# db.auth_user.nombre = Field.Virtual(lambda row:
+#     '{first_name} {last_name}'.format(**row.auth_user).strip())
+
 # -------------------------------------------------------------------------
 # configure email
 # -------------------------------------------------------------------------

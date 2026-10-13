@@ -38,71 +38,70 @@ def solicitudes():
             ]
             res = db(db.solicitud.id == id).select(*fields).first()
             # Validate.get(solicitud=res)
-            res["padre"] = db(db.solicitudes.id == res.padre).select(*fields2).first()
-            res["hijos"] = db(db.solicitudes.padre_id == id).select(*fields2).as_list()
-            res["remitente"] = db.vw_usuario(res.remitente)
-            res["supervisor"] = db.vw_usuario(res.supervisor)
-            res["tramitador"] = db.vw_usuario(res.tramitador)
-            res["origen"] = db.area(res.origen)
-            res["destino"] = db.area(res.destino)
-            res["tipo"] = db.tipo(res.tipo)
-            res["estado"] = db.estado(res.estado)
-            res["cant_nota"] = db(db.nota.solicitud == id).count()
+            res.padre = db(db.solicitudes.id == res.padre).select(*fields2).first()
+            res.hijos = db(db.solicitudes.padre_id == id).select(*fields2).as_list()
+            res.remitente = db.vw_usuario(res.remitente)
+            res.supervisor = db.vw_usuario(res.supervisor)
+            res.tramitador = db.vw_usuario(res.tramitador)
+            res.origen = db.area(res.origen)
+            res.destino = db.area(res.destino)
+            res.tipo = db.tipo(res.tipo)
+            res.estado = db.estado(res.estado)
+            res.cant_nota = db(db.nota.solicitud == id).count()
             q = db.adjuntos.solicitud_id == id
-            res["adjuntos_solicitud"] = (
+            res.adjuntos_solicitud = (
                 db(q & (db.adjuntos.tipo == 1)).select().as_list()
             )
-            res["adjuntos_respuesta"] = (
+            res.adjuntos_respuesta = (
                 db(q & (db.adjuntos.tipo == 2)).select().as_list()
             )
             # Usuario: roles y permisos contextuales
-            esSupervisorAreaDemandada = auth.has_membership("supervisor") and (res["destino"]["id"] == auth.user.area)
-            esSupervisorSolicitud = res["supervisor"]["id"] == auth.user_id if res["supervisor"] else False
-            esTramitadorSolicitud = res["tramitador"]["id"] == auth.user_id if res["tramitador"] else False
-            esRemitenteSolicitud = res["remitente"]["id"] == auth.user_id if res["remitente"] else False
-            res["permisos"] = {
+            esSupervisorAreaDemandada = auth.has_membership("supervisor") and (res.destino.id == auth.user.area)
+            esSupervisorSolicitud = res.supervisor.id == auth.user_id if res.supervisor else False
+            esTramitadorSolicitud = res.tramitador.id == auth.user_id if res.tramitador else False
+            esRemitenteSolicitud = res.remitente.id == auth.user_id if res.remitente else False
+            res.permisos = {
                 "asignar": (
-                    res["estado"]["id"] < 3  # solicitada, en proceso (asignada)
+                    res.estado.id < 3  # solicitada, en proceso (asignada)
                     and esSupervisorAreaDemandada  # puede asignar o reasignar
                 ),
                 "reenviar": ((
-                    res["estado"]["id"] == 2  # en proceso
+                    res.estado.id == 2  # en proceso
                     and esTramitadorSolicitud  # puede reenviar solicitudes a su cargo
                 )
                 or (
-                    res["estado"]["id"] == 1  # solicitada (no asignada)
+                    res.estado.id == 1  # solicitada (no asignada)
                     and esSupervisorAreaDemandada  # puede reenviar (convirtiendose en tramitador) 
                 )),
                 "responder": (
-                    res["estado"]["id"] == 2  # en proceso
+                    res.estado.id == 2  # en proceso
                     and esTramitadorSolicitud  # puede responder solicitudes a su cargo
                 ),
                 "aprobar": (
-                    res["estado"]["id"] == 3  # en evaluacion (respondida)
+                    res.estado.id == 3  # en evaluacion (respondida)
                     and esSupervisorSolicitud  # puede aprobar solicitudes a su cargo
                 ),
                 "evaluar": (
-                    res["estado"]["id"] == 4  # terminada
-                    and not res["evaluacion"]  # no evaluada
+                    res.estado.id == 4  # terminada
+                    and not res.evaluacion  # no evaluada
                     and esRemitenteSolicitud  # puede evaluar sus solicitudes
                     # TODO: acotar en tiempo (plazo para evaluar)
                 ),
                 "comentar": (
-                    res["estado"]["id"] < 4  # no terminada
+                    res.estado.id < 4  # no terminada
                     and (  # puede escribir notas estando asociado la solicitud
                         esSupervisorSolicitud
                         or esTramitadorSolicitud
                         or esRemitenteSolicitud
                     )
                 )
-            }            
-
+            }
             return response.json(res)
-        else:
-            from gluon.storage import Storage
-            from applications.admred.modules.db.solicitudes import solicitudes
+        
+        from gluon.storage import Storage
+        from applications.admred.modules.db.solicitudes import solicitudes
 
-            return response.json(solicitudes(db, auth, Storage(vars)))
+        return response.json(solicitudes(db, auth, Storage(vars)))
 
     @auth.requires_login()
     def PUT(id, **vars):  # asignar, responder, aprobar and evaluar
@@ -170,7 +169,7 @@ def solicitudes():
             return response.json(res)
 
     @auth.requires_login()
-    def POST(*args, **vars):
+    def POST(**vars):
         """
         user: destino, objetivo, adjuntos, tipo, cumplir_en,
               (if forward) padre

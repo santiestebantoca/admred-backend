@@ -90,6 +90,7 @@ def buscar_codigo():
 
     @auth.requires_login()
     def GET(*args, **vars):
+        
         fds = [
             db.solicitud.id,
             db.solicitud.codigo,
@@ -102,8 +103,8 @@ def buscar_codigo():
         q = db.solicitud.codigo.contains(vars['codigo'])
         res = db(q).select(*fds, limitby=(0, 10))
         for row in res:
-            row["origen"] = db.area(row.origen).nombre
-            row["destino"] = db.area(row.destino).nombre
+            row.origen = db.area(row.origen).nombre
+            row.destino = db.area(row.destino).nombre
         return response.json(res)
 
     def OPTIONS(*args, **vars):
@@ -137,7 +138,8 @@ def solicitudes_externas():
         if origen:
             q &= db.solicitudes.origen_id == origen
         else:
-            area_ids = db(db.area.nivel.belongs(NIVELES_AREAS_EXTERNAS))._select(db.area.id)
+            niveles_externos = db(db.nivel.alcance == 'externo')._select(db.nivel.id)
+            area_ids = db(db.area.nivel.belongs(niveles_externos))._select(db.area.id)
             q &= db.solicitudes.origen_id.belongs(area_ids)
         q &= db.solicitudes.destino_id == DIRECCION_ADMINISTRACION_ID
         if estado:
@@ -188,7 +190,8 @@ def solicitudes_internas():
         if origen:
             q &= db.solicitudes.origen_id == origen
         else:
-            _q = db.area.nivel.belongs(NIVELES_AREAS_INTERNAS)
+            niveles_internos = db(db.nivel.alcance == 'interno')._select(db.nivel.id)
+            _q = db.area.nivel.belongs(niveles_internos)
             _q &= ~db.area.id.belongs(AREAS_AR_IDS)
             area_ids = db(_q)._select(db.area.id)
             q &= db.solicitudes.origen_id.belongs(area_ids)
