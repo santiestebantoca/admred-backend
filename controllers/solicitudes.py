@@ -100,7 +100,7 @@ def solicitudes():
         
         from applications.admred.modules.db.solicitudes import solicitudes
 
-        return response.json(solicitudes(db, auth, **vars))
+        return response.json(solicitudes(**vars))
 
     @auth.requires_login()
     def PUT(id, **vars):  # asignar, responder, aprobar and evaluar
@@ -143,7 +143,7 @@ def solicitudes():
                 q &= db.adjunto.tipo == 2
                 q &= ~db.adjunto.upload_id.belongs(adjuntos)
                 db(db.upload.id.belongs(db(q)._select(db.adjunto.upload_id))).delete()
-                add_adjuntos(db, solicitud_id, adjuntos, 2)
+                add_adjuntos(solicitud_id, adjuntos, 2)
             return response.json(res)
         if "aprobado" in vars:
             Validate.approve(solicitud=db.solicitud(solicitud_id))
@@ -184,7 +184,7 @@ def solicitudes():
 
         adjuntos = vars.pop("adjuntos", [])
 
-        vars["codigo"] = codigo(db)
+        vars["codigo"] = codigo()
         vars["solicitado_en"] = request.now
         vars["origen"] = auth.user.area
         vars["remitente"] = auth.user_id
@@ -193,7 +193,7 @@ def solicitudes():
         if (res.errors):
             response.status = 422
             return response.json(res.errors)
-        add_adjuntos(db, res.id, adjuntos, 1)
+        add_adjuntos(res.id, adjuntos, 1)
         if "padre" in vars:
             response.callback = False  # this action is invisible to callbacks
             q = db.solicitud.id == vars["padre"]

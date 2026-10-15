@@ -3,6 +3,7 @@
 from gluon.contrib.login_methods.ldap_auth import ldap_auth
 from gluon.contrib.appconfig import AppConfig
 from gluon.tools import Auth
+from gluon import current
 
 request.requires_https()
 
@@ -115,3 +116,6 @@ if request.ajax:
 
     auth.settings.on_failed_authentication = resp401
     auth.settings.on_failed_authorization = resp403
+
+current.db = db
+current.auth = auth

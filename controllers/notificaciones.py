@@ -35,12 +35,12 @@ def notificaciones():
             return db(q).select(db.solicitudes.id, db.solicitudes.codigo)
 
         def cantidad_de_recibidas_pendientes():
-            q = solicitudes_recibidas(auth, db)
+            q = solicitudes_recibidas()
             q &= db.solicitudes.estado_id != 4
             return db(q).count()
 
         def cantidad_de_enviadas_pendientes():
-            q = solicitudes_enviadas(auth, db)
+            q = solicitudes_enviadas()
             q &= db.solicitudes.estado_id != 4
             return db(q).count()
         

@@ -1,13 +1,17 @@
 # -*- coding: utf-8 -*-
 __author__ = "jorge.santiesteban"
 
+from gluon import current
 
-def codigo(db):
+
+def codigo():
     """
     `codigo` is a db view
     """
     from datetime import date
 
+    db = current.db
+    
     year, consec = str(date.today().year)[2:], 1
     rows = db.executesql("SELECT codigo FROM codigo", as_dict=True)
     if len(rows):
@@ -16,25 +20,35 @@ def codigo(db):
     return "S-%s-%04d" % (year, consec)
 
 
-def solicitudes_recibidas(auth, db):
+def solicitudes_recibidas():
+
+    db = current.db
+    auth = current.auth
+    
     if auth.has_membership("supervisor"):
         return db.solicitudes.destino_id == auth.user.area
     return db.solicitudes.tramitador_id == auth.user_id
 
 
-def solicitudes_enviadas(auth, db):
+def solicitudes_enviadas():
+
+    db = current.db
+    auth = current.auth
+    
     if auth.has_membership("supervisor"):
         return db.solicitudes.origen_id == auth.user.area
     return db.solicitudes.remitente_id == auth.user_id
 
 
-def terminado_en_periodo(db, period):
+def terminado_en_periodo(period):
     """
     Period ago:
     [14 days, 1 month, 6 months, 1 year]
     """
     from datetime import date, timedelta
 
+    db = current.db
+    
     start = date.today()
     if period in ["2", "3", "4"]:
         i_month = start.month - [1, 6, 12][int(period) - 2]
@@ -47,8 +61,6 @@ def terminado_en_periodo(db, period):
 
 
 def solicitudes(
-    db,
-    auth,
     tray,
     state,
     period=None,
@@ -65,6 +77,10 @@ def solicitudes(
     """
     returns::
     """
+
+    db = current.db
+    auth = current.auth
+    
     left = False
     fds = [
         db.solicitudes.id,
@@ -79,14 +95,14 @@ def solicitudes(
     args = dict(distinct=True, orderby=~db.solicitudes.id)
     q = db.solicitudes.id > 0
     if tray == "recibidas":
-        q = solicitudes_recibidas(auth, db)
+        q = solicitudes_recibidas()
     elif tray == "enviadas":
-        q = solicitudes_enviadas(auth, db)
+        q = solicitudes_enviadas()
     if state == "pendientes":
         q &= db.solicitudes.estado_id != 4
     elif state == "terminadas":
         q &= db.solicitudes.estado_id == 4
-        q &= terminado_en_periodo(db, period)
+        q &= terminado_en_periodo(period)
     if status:
         q &= db.solicitudes.estado_id == status
     if codigo:
@@ -138,7 +154,7 @@ def solicitudes(
     }
 
 
-def add_adjuntos(db, solicitud_id, upload_ids, tipo=1):
+def add_adjuntos(solicitud_id, upload_ids, tipo=1):
     for upload_id in upload_ids:
         if (
             db(

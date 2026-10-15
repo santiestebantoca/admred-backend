@@ -6,7 +6,17 @@ __author__ = 'jorge.santiesteban'
 def usuarios():
     
     @auth.requires_membership('administrador')
-    def GET(id=None, search=None, search_in=None, nombre=None, area=None, rol=None, estado=None, page=None, limit=None):
+    def GET(
+        id=None,
+        search=None,
+        search_in=None,
+        nombre=None,
+        area=None,
+        rol=None,
+        estado=None,
+        page=None,
+        limit=None
+    ):
         if id:
             grupos_ids = db(db.auth_membership.user_id == id)._select(db.auth_membership.group_id)
             usuario_en_solicitud = db.solicitud.tramitador == id
@@ -28,7 +38,7 @@ def usuarios():
             ]
             usuario = db(db.auth_user.id == id).select(*fds).first()
             usuario.area = db.area(usuario.area)
-            usuario.grupos = db(db.auth_group.id.belongs(grupos_ids)).select()  
+            usuario.grupos = db(db.auth_group.id.belongs(grupos_ids)).select().as_list()
             usuario.modified_by = usuario.modified_by and db.vw_usuario(usuario.modified_by).name
             usuario.permisos = {
                 "eliminar": not bool(db(usuario_en_solicitud).count())
@@ -107,60 +117,66 @@ def usuarios():
     @auth.requires_membership('administrador')
     def POST(grupos, **vars):
         """
-        auth_user.email y auth_user.username, por defecto se validan
-        que no estén tomados (ej., IS_NOT_IN_DB(db, "auth_user.email"))
-        Para cambiar estas validaciones de puede hacer, por ejemplo:
-        db.auth_user.email.requires = None
-        db.auth_user.email.requires = IS_EMPTY_OR(IS_NOT_IN_DB(db, "auth_user.email"))
+        Auth valida:
+        `email` y `username`, que no estén tomados.
+        `password` es requerido.
+        Reglas:
+        1. Se disabilita la validación de Auth para `password`.
+        2. Un administrador no AR solo crea usuarios en su área.
         """
-        db.auth_user.password.requires = None  # disabilita la validación de auth
+        db.auth_user.password.requires = None
         if db.area(auth.user.area).rol_key != 'AR':
-            vars['area'] = auth.user.area  # Admin no AR solo crea usuarios en su área
+            vars['area'] = auth.user.area
         res = db.auth_user.validate_and_insert(**vars)
         if (res.errors):
             response.status = 422
             return response.json(res.errors)
         # Membership
-        for group_id in grupos:
-            db.auth_membership.insert(user_id=res["id"], group_id=group_id)
+        from applications.admred.modules.db.auth import create_membership
+        
+        create_membership(res['id'], grupos)
+
         return response.json(res)
 
     @auth.requires_membership('administrador')
     @Validate.user_in_scope
-    def PUT(id, **vars):
-        """ lo de sms
-        Esta app no usa auth_user.email, de lo contrario se aplica:
-        db.auth_user.email.requires = IS_EMPTY_OR(IS_NOT_IN_DB(otros_usuarios, "auth_user.email"))
+    def PUT(id, grupos, **vars):
         """
-        db.auth_user.password.requires = None  # disable validator
-        db.auth_user.email.requires = None # disable validator
+        `registration_key`="", web2py lo inserta con NULL.
+        Cambio este comportamiento con registration_key.requires = None
+        Reglas:
+        1. `email` y `username` no permiten vacíos y no pueden existir en otros registros.
+        2. Un administrador no AR no cambia `area`.
+        3. `username` se puede cambiar solo si el usuario no tiene actividad auditable.
+        """
+        db.auth_user.registration_key.requires = None
         otros_usuarios = db(db.auth_user.id != id)
-        db.auth_user.username.requires = [IS_NOT_EMPTY(),
-                                          IS_NOT_IN_DB(otros_usuarios, "auth_user.username")]
+        db.auth_user.username.requires = [
+            IS_NOT_EMPTY(),
+            IS_NOT_IN_DB(otros_usuarios, "auth_user.username")
+        ]
+        db.auth_user.email.requires = [
+            IS_NOT_EMPTY(),
+            IS_NOT_IN_DB(otros_usuarios, "auth_user.email")
+        ]
+        if db.area(auth.user.area).rol_key != "AR":
+            del vars['area']
+        # Permitir editar `username`
+        usuario_en_solicitud = db.solicitud.tramitador == id
+        usuario_en_solicitud |= db.solicitud.remitente == id
+        usuario_en_solicitud |= db.solicitud.supervisor == id
+        if bool(db(usuario_en_solicitud).count()):
+            del vars['username']
         res = db(db.auth_user.id == id).validate_and_update(**vars)
         if (res.errors):
             response.status = 422
             return response.json(res.errors)
-        return response.json(db.auth_user(id))
-        """ lo de admred
-        current_values = db(db.auth_user.id == id).select(
-            db.auth_user.email,
-            db.auth_user.username
-        ).first()
+        # Membership
+        from applications.admred.modules.db.auth import update_membership
+        
+        update_membership(id, grupos)
 
-        # `email` and `username`, fails to update with same values,
-        # it is due to fields requires NOT_IN_DB
-        if ('email' in vars) and vars['email'] == current_values.email:
-            del vars['email']
-        if ('username' in vars) and vars['username'] == current_values.username:
-            del vars['username']
-        # admin from area not AR, is not allow to change `area`
-        if db.area(auth.user.area).rol_key != 'AR':
-            del vars['area']
-
-        res = db(db.auth_user.id == id).validate_and_update(**vars)
-        return response.json(res)
-        """  
+        return response.json(res) 
           
     @auth.requires_membership('administrador')
     @Validate.user_in_scope
