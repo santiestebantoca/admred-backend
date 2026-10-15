@@ -46,7 +46,22 @@ def terminado_en_periodo(db, period):
     return db.solicitudes.terminado_en > start
 
 
-def solicitudes(db, auth, vars):
+def solicitudes(
+    db,
+    auth,
+    tray,
+    state,
+    period=None,
+    status=None,
+    codigo=None,
+    objetivo=None,
+    origen=None,
+    destino=None,
+    search=None,
+    search_in=None,
+    page=None,
+    limit=None
+    ):
     """
     returns::
     """
@@ -58,50 +73,69 @@ def solicitudes(db, auth, vars):
         db.solicitudes.estado,
         db.solicitudes.solicitado_en,
         db.solicitudes.terminado_en,
-        db.solicitudes.origen if vars.tray == "recibidas" else db.solicitudes.destino,
-        # *([db.solicitudes.origen] if vars.tray == "recibidas" else []), Python 3.x
-        # *([db.solicitudes.destino] if vars.tray == "enviadas" else []),
-        # db.solicitudes.supervisor_rk, # future
-        # db.solicitudes.tramitador_rk # future
+        db.solicitudes.origen if tray == "recibidas" else db.solicitudes.destino,
         db.solicitudes.padre_id
     ]
     args = dict(distinct=True, orderby=~db.solicitudes.id)
     q = db.solicitudes.id > 0
-    if vars.tray == "recibidas":
+    if tray == "recibidas":
         q = solicitudes_recibidas(auth, db)
-    elif vars.tray == "enviadas":
+    elif tray == "enviadas":
         q = solicitudes_enviadas(auth, db)
-    if vars.state == "pendientes":
+    if state == "pendientes":
         q &= db.solicitudes.estado_id != 4
-    elif vars.state == "terminadas":
+    elif state == "terminadas":
         q &= db.solicitudes.estado_id == 4
-        q &= terminado_en_periodo(db, vars.period)
-    if vars.status:
-        q &= db.solicitudes.estado_id == vars.status
-    if vars.codigo:
-        q &= db.solicitudes.codigo.contains(vars.codigo)
-    if vars.objetivo:
-        q &= db.solicitudes.objetivo.contains(vars.objetivo)
-    if vars.origen:
-        q &= db.solicitudes.origen.contains(vars.origen)
-    if vars.destino:
-        q &= db.solicitudes.destino.contains(vars.destino)
+        q &= terminado_en_periodo(db, period)
+    if status:
+        q &= db.solicitudes.estado_id == status
+    if codigo:
+        q &= db.solicitudes.codigo.contains(codigo)
+    if objetivo:
+        q &= db.solicitudes.objetivo.contains(objetivo)
+    if origen:
+        q &= db.solicitudes.origen.contains(origen)
+    if destino:
+        q &= db.solicitudes.destino.contains(destino)
     # Search in fields
-    if vars.search:
+    if search:
         qor = None
-        for field in vars.search_in:
+        for field in search_in:
             if qor:
-                qor |= db.solicitudes[field].contains(vars.search)
+                qor |= db.solicitudes[field].contains(search)
             else:
-                qor = db.solicitudes[field].contains(vars.search)
+                qor = db.solicitudes[field].contains(search)
         q &= qor
     # return::
+    if page and limit:
+        _page = int(page)
+        _limit = int(limit)
+        args.update(limitby=((_page - 1) * _limit, _page * _limit))
+        sql = db(q)._select(*fds, left=left, **args)
+        data = db.executesql(sql)
+        sql = db(q)._select(*fds, left=left).split(" FROM ", 1)
+        sql = "SELECT COUNT(DISTINCT solicitudes.id) FROM " + sql[1]
+        total = db.executesql(sql)[0][0]
+        total_pages = ceil(total / _limit)
+        return response.json({
+            "data": data,
+            "meta": {
+                "total": total,
+                "page": _page,
+                "limit": _limit,
+                "totalPages": total_pages,
+                "hasNext": _page < total_pages,
+                "hasPrev": _page > 1
+            }
+        })    
     sql = db(q)._select(*fds, left=left, **args)
-    rows = db.executesql(sql)
-    sql = db(q)._select(*fds, left=left).split(" FROM ", 1)
-    sql = "SELECT COUNT(DISTINCT solicitudes.id) FROM " + sql[1]
-    count = db.executesql(sql)[0][0]
-    return dict(data=rows, total=count)
+    data = db.executesql(sql)    
+    return {
+        "data": data,
+        "meta": {
+            "total": len(data)
+        }
+    }
 
 
 def add_adjuntos(db, solicitud_id, upload_ids, tipo=1):

@@ -55,7 +55,7 @@ def areas():
             q &= db.areas.padre_id == padre
         if rol_key:
             q &= db.areas.rol_key != None
-        if search:
+        if search and search_in:
             if isinstance(search_in, str):
                 search_in = [search_in]
                 
@@ -134,7 +134,7 @@ class Validate:
     def auth_from_AR(fn):
         def run(*k, **kw):
             if not db.area(auth.user.area).rol_key == 'AR':
-                raise HTTP(403, 'Forbidden.')
+                raise HTTP(403, 'Forbidden.', **headers)
             return fn(*k, **kw)
 
         return run
@@ -148,8 +148,7 @@ class Validate:
             c += db((db.solicitud.origen == id) |
                     (db.solicitud.destino == id)).count()
             if c:
-                raise HTTP(
-                    405, 'Una regla de integridad impidió realizar esta acción.')
+                raise HTTP(405, 'No permitido por una regla de integridad', **headers)
             return fn(*k, **kw)
 
         return run

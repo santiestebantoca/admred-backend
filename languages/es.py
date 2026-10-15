@@ -7,6 +7,8 @@
 'Insufficient privileges': 'Insufficient privileges',
 'Last name': 'Last name',
 'Logged out': 'Logged out',
+'This email already has an account': 'This email already has an account',
 'Username': 'Username',
+'Username already taken': 'Username already taken',
 'Value not in database': 'Value not in database',
 }

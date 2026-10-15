@@ -44,7 +44,7 @@ def tipos():
                 )
                 ids = [row['solicitud']['tipo'] for row in tipos_poco_usados]
                 q &= db.tipo.id.belongs(ids)
-        if search:
+        if search and search_in:
             if isinstance(search_in, str):
                 search_in = [search_in]
                 
@@ -121,7 +121,7 @@ class Validate:
     def auth_from_AR(fn):
         def run(*k, **kw):
             if not db.area(auth.user.area).rol_key == 'AR':
-                raise HTTP(403, 'Forbidden.')
+                raise HTTP(403, 'Forbidden.', **headers)
             return fn(*k, **kw)
 
         return run
@@ -131,8 +131,7 @@ class Validate:
         def run(*k, **kw):
             id = k[0]
             if db(db.solicitud.tipo == id).count():
-                raise HTTP(
-                    405, 'Una regla de integridad impidió realizar esta acción.')
+                raise HTTP(405, 'No permitido por una regla de integridad.', **headers)
             return fn(*k, **kw)
 
         return run

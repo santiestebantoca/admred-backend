@@ -79,4 +79,4 @@ class Validate:
             auth.user_id
             in [solicitud.tramitador, solicitud.remitente, solicitud.supervisor]
         ):
-            raise HTTP(403, "Forbidden")
+            raise HTTP(403, "Forbidden", **headers)

@@ -98,10 +98,9 @@ def solicitudes():
             }
             return response.json(res)
         
-        from gluon.storage import Storage
         from applications.admred.modules.db.solicitudes import solicitudes
 
-        return response.json(solicitudes(db, auth, Storage(vars)))
+        return response.json(solicitudes(db, auth, **vars))
 
     @auth.requires_login()
     def PUT(id, **vars):  # asignar, responder, aprobar and evaluar
@@ -228,7 +227,7 @@ class Validate:
         if db.area(auth.user.area).rol_key == "AR":
             return
         if auth.user.area not in [solicitud.origen, solicitud.destino]:
-            raise HTTP(403, "Forbidden")
+            raise HTTP(403, "Forbidden", **headers)
 
     @staticmethod
     def assign(tramitador, solicitud):
@@ -241,7 +240,7 @@ class Validate:
             and auth.user.area == solicitud.destino
             and tramitador.area == solicitud.destino
         ):
-            raise HTTP(403, "Forbidden")
+            raise HTTP(403, "Forbidden", **headers)
 
     @staticmethod
     def reply(solicitud):
@@ -249,7 +248,7 @@ class Validate:
         User has to be the 'tramitador' of this 'solicitud'
         """
         if not (auth.user_id == solicitud.tramitador):
-            raise HTTP(403, "Forbidden")
+            raise HTTP(403, "Forbidden", **headers)
 
     @staticmethod
     def approve(solicitud):
@@ -257,7 +256,7 @@ class Validate:
         User has to be the 'supervisor' of this 'solicitud'
         """
         if not (auth.user_id == solicitud.supervisor):
-            raise HTTP(403, "Forbidden")
+            raise HTTP(403, "Forbidden", **headers)
 
     @staticmethod
     def rate(solicitud):
@@ -265,4 +264,4 @@ class Validate:
         User has to be the 'remitente' of this 'solicitud'
         """
         if not (auth.user_id == solicitud.remitente):
-            raise HTTP(403, "Forbidden")
+            raise HTTP(403, "Forbidden", **headers)

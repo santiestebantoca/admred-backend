@@ -36,11 +36,6 @@ auth.define_tables(username=True)
 
 db.auth_user.format = '%(first_name)'
 
-db.auth_user.nombre = Field.Method(lambda row:
-    '{first_name} {last_name}'.format(**row.auth_user).strip())
-# db.auth_user.nombre = Field.Virtual(lambda row:
-#     '{first_name} {last_name}'.format(**row.auth_user).strip())
-
 # -------------------------------------------------------------------------
 # configure email
 # -------------------------------------------------------------------------
@@ -84,16 +79,14 @@ tabla = db.define_table
 T.force('es')
 
 """
-As long as possible, we use validate_and_update/insert rather than update or SQLFORM
-* validate_and_update returns an Object with 'updated' and 'errors' which is a standard on client side
-* validate_and_insert returns an Object with 'id' and 'errors' which is a standard on client side
+La aplicación usa validate_and_update/insert en vez de SQLFORM
+Estos métodos devuelven un objeto {updated/id, errors} que es estándar en el cliente
 """
 
 # CORS Policy (RESTFUL API )
 """
-Using X-Requested-With header, implies using OPTIONS for any method (GET, POST, ...)
-We force X-Requested-With: XMLHttpRequest in client request,
-that is the way web2py recognizes the ajax request.
+Usar X-Requested-With header, implica usar OPTIONS para cualquier método (GET, POST, ...)
+La petición del cliente trae X-Requested-With: XMLHttpRequest, así web2py la reconozca como ajax.
 """
 
 # frontURL = configuration.get('front.url', request.env.http_origin)
@@ -110,8 +103,6 @@ headers = {
     # 24hrs  // cache for Allow Header & Allow Methods
     'Access-Control-Max-Age': 86400,
 }
-
-# response.headers.update(**headers)
 
 if request.ajax:
 

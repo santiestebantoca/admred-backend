@@ -358,7 +358,7 @@ class Validate:
     def auth_from_AR(fn):
         def run(*k, **kw):
             if not db.area(auth.user.area).rol_key == 'AR':
-                raise HTTP(403, 'Forbidden.')
+                raise HTTP(403, 'Forbidden.', **headers)
             return fn(*k, **kw)
 
         return run
