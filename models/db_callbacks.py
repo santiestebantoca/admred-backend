@@ -34,26 +34,27 @@ def run_in_thread(fn):
 
 @run_in_thread
 def email_send(email_list, subject, message):
-    footer = 'Acceda a la plataforma ADMRED en: https://192.168.90.169'
-    # mail.send(to=email_list, subject=subject,
-    #           message=message + '\n\n' + footer)
+    footer = 'Acceda a la plataforma ADMRED en: https://admred.vpor.etecsa.cu'
+    mail.send(to=email_list, subject=subject,
+              message=message + '\n\n' + footer)
 
 
 @run_in_thread
 def sms_send(numbers, text):
     from applications.admred.modules.util import fetchPOST
     url = configuration.get('api_sms.enviar')
-    # for number in numbers:
-    #     data = {'number': number, 'text': text, 'sender': 'ADM Red'}
-    #     fetchPOST(url, data)
+    for number in numbers:
+        data = {'number': number, 'text': text, 'sender': 'ADM Red'}
+        fetchPOST(url, data)
 
 
 @run_in_thread
 def ws_send(data):
-    import json
-    from websocket_messaging import websocket_send
-    websocket_send(configuration.get('websocket.url'),
-                   json.dumps(data), '', 'admred')
+    pass
+    # import json
+    # from websocket_messaging import websocket_send
+    # websocket_send(configuration.get('websocket.url'),
+    #                json.dumps(data), '', 'admred')
 
 
 def nota_insert(f, i):

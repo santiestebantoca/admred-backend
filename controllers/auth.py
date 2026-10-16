@@ -142,4 +142,4 @@ def users():
 
 
 def can_impersonate():
-    return auth.user_id in [1, 2, 235, 4]
+    return auth.user_id in [1, 2, 235, 4, 523]
