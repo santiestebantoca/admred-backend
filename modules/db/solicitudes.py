@@ -11,7 +11,7 @@ def codigo():
     from datetime import date
 
     db = current.db
-    
+
     year, consec = str(date.today().year)[2:], 1
     rows = db.executesql("SELECT codigo FROM codigo", as_dict=True)
     if len(rows):
@@ -24,7 +24,7 @@ def solicitudes_recibidas():
 
     db = current.db
     auth = current.auth
-    
+
     if auth.has_membership("supervisor"):
         return db.solicitudes.destino_id == auth.user.area
     return db.solicitudes.tramitador_id == auth.user_id
@@ -34,7 +34,7 @@ def solicitudes_enviadas():
 
     db = current.db
     auth = current.auth
-    
+
     if auth.has_membership("supervisor"):
         return db.solicitudes.origen_id == auth.user.area
     return db.solicitudes.remitente_id == auth.user_id
@@ -48,7 +48,7 @@ def terminado_en_periodo(period):
     from datetime import date, timedelta
 
     db = current.db
-    
+
     start = date.today()
     if period in ["2", "3", "4"]:
         i_month = start.month - [1, 6, 12][int(period) - 2]
@@ -80,7 +80,7 @@ def solicitudes(
 
     db = current.db
     auth = current.auth
-    
+
     left = False
     fds = [
         db.solicitudes.id,
@@ -143,9 +143,9 @@ def solicitudes(
                 "hasNext": _page < total_pages,
                 "hasPrev": _page > 1
             }
-        })    
+        })
     sql = db(q)._select(*fds, left=left, **args)
-    data = db.executesql(sql)    
+    data = db.executesql(sql)
     return {
         "data": data,
         "meta": {
@@ -155,13 +155,12 @@ def solicitudes(
 
 
 def add_adjuntos(solicitud_id, upload_ids, tipo=1):
+    
+    db = current.db
+
     for upload_id in upload_ids:
-        if (
-            db(
-                (db.adjunto.solicitud_id == solicitud_id)
-                & (db.adjunto.upload_id == upload_id)
-                & (db.adjunto.tipo == tipo)
-            ).count()
-            == 0
-        ):
+        q = db.adjunto.solicitud_id == solicitud_id
+        q &= db.adjunto.upload_id == upload_id
+        q &= db.adjunto.tipo == tipo
+        if not db(q).count():
             db.adjunto.insert(solicitud_id=solicitud_id, upload_id=upload_id, tipo=tipo)

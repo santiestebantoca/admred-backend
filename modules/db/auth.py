@@ -8,27 +8,26 @@ def create_membership(user_id, group_ids=[]):
 
     if not user_id:
             return
-        
+
     db = current.db
-    
+
     if isinstance(group_ids, str):
         group_ids = [group_ids]
-        
+
     for group_id in group_ids:
         db.auth_membership.insert(user_id=user_id, group_id=group_id)
-                
-        
+
 
 def update_membership(user_id, group_ids=[]):
-    
+
     if not user_id:
         return
-    
+
     db = current.db
-    
+
     if isinstance(group_ids, str):
         group_ids = [group_ids]
-    
+
     # 1. Eliminar los que ya no están
     deleteQuery = db.auth_membership.user_id == user_id
     deleteQuery &= ~db.auth_membership.group_id.belongs(group_ids)
