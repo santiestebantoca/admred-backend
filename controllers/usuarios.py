@@ -118,13 +118,20 @@ def usuarios():
     def POST(grupos, **vars):
         """
         Auth valida:
-        `email` y `username`, que no estén tomados.
-        `password` es requerido.
+        1. `email` y `username` no vacíos y no tomados.
+        2. `password` no vacío.
+        Auth establece por defecto:
+        1. `registration_key`, `reset_password_key`, `registration_id` en '' (vacío).
         Reglas:
-        1. Se disabilita la validación de Auth para `password`.
-        2. Un administrador no AR solo crea usuarios en su área.
+        1. Se disabilita la validación de `password` (No viene en vars).
+        2. Se establecen `registration_key`, `reset_password_key`, `registration_id` en None (NULL).
+        3. Se establece `area` en la del usuario autenticado si este no es AR.
         """
         db.auth_user.password.requires = None
+        db.auth_user.email.requires = None
+        db.auth_user.registration_key.default = None
+        db.auth_user.reset_password_key.default = None
+        db.auth_user.registration_id.default = None        
         if db.area(auth.user.area).rol_key != 'AR':
             vars['area'] = auth.user.area
         res = db.auth_user.validate_and_insert(**vars)
@@ -134,7 +141,7 @@ def usuarios():
         # Membership
         from applications.admred.modules.db.auth import create_membership
         
-        create_membership(res['id'], grupos)
+        create_membership(res.id, grupos)
 
         return response.json(res)
 
@@ -142,14 +149,12 @@ def usuarios():
     @Validate.user_in_scope
     def PUT(id, grupos, **vars):
         """
-        `registration_key`="", web2py lo inserta con NULL.
-        Cambio este comportamiento con registration_key.requires = None
         Reglas:
-        1. `email` y `username` no permiten vacíos y no pueden existir en otros registros.
-        2. Un administrador no AR no cambia `area`.
-        3. `username` se puede cambiar solo si el usuario no tiene actividad auditable.
-        """
-        db.auth_user.registration_key.requires = None
+        1. Se disabilita la validación de `email` (No viene en vars).
+        2. Se validan `email` y `username` no vacíos y no tomados.
+        3. Se elimina `area` si el usuario autenticado no es AR (No puede cambiarla).
+        4. Se elimina `username` si el usuario tiene actividad auditable.
+        """                
         otros_usuarios = db(db.auth_user.id != id)
         db.auth_user.username.requires = [
             IS_NOT_EMPTY(),
