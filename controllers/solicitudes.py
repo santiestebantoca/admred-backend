@@ -7,7 +7,7 @@ def solicitudes():
     @auth.requires_login()  # it uses auth.user
     def GET(id=None, **vars):
         if id:
-            fields = [
+            fds = [
                 db.solicitud.id,
                 db.solicitud.codigo,
                 db.solicitud.objetivo,
@@ -26,8 +26,9 @@ def solicitudes():
                 db.solicitud.cumplir_en,
                 db.solicitud.observaciones,
                 db.solicitud.evaluacion,
+                db.solicitud.actividad,
             ]
-            fields2 = [
+            fds_ = [
                 db.solicitudes.id,
                 db.solicitudes.codigo,
                 db.solicitudes.origen,
@@ -36,10 +37,10 @@ def solicitudes():
                 db.solicitudes.origen_id,
                 db.solicitudes.destino_id,
             ]
-            res = db(db.solicitud.id == id).select(*fields).first()
+            res = db(db.solicitud.id == id).select(*fds).first()
             # Validate.get(solicitud=res)
-            res.padre = db(db.solicitudes.id == res.padre).select(*fields2).first()
-            res.hijos = db(db.solicitudes.padre_id == id).select(*fields2).as_list()
+            res.padre = db(db.solicitudes.id == res.padre).select(*fds_).first()
+            res.hijos = db(db.solicitudes.padre_id == id).select(*fds_).as_list()
             res.remitente = db.vw_usuario(res.remitente)
             res.supervisor = db.vw_usuario(res.supervisor)
             res.tramitador = db.vw_usuario(res.tramitador)

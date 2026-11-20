@@ -34,6 +34,7 @@ def run_in_thread(fn):
 
 @run_in_thread
 def email_send(email_list, subject, message):
+    return
     footer = 'Acceda a la plataforma ADMRED en: https://admred.vpor.etecsa.cu'
     mail.send(to=email_list, subject=subject,
               message=message + '\n\n' + footer)
@@ -41,6 +42,7 @@ def email_send(email_list, subject, message):
 
 @run_in_thread
 def sms_send(numbers, text):
+    return
     from applications.admred.modules.util import fetchPOST
     url = configuration.get('api_sms.enviar')
     for number in numbers:
