@@ -10,5 +10,6 @@
 'This email already has an account': 'This email already has an account',
 'Username': 'Username',
 'Username already taken': 'Username already taken',
+'Value not allowed': 'Value not allowed',
 'Value not in database': 'Value not in database',
 }

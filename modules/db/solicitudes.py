@@ -20,6 +20,22 @@ def codigo():
     return "S-%s-%04d" % (year, consec)
 
 
+def requiere_actividad(solicitud):
+    """
+    Una solicitud requiere actividad cuando la envía un área de nivel 7
+    (Áreas de los Territorios) a su área padre de nivel 6 (Grupo de
+    Administración de los Territorios).
+    """
+    db = current.db
+
+    origen_id = solicitud.origen.id if hasattr(solicitud.origen, "id") else solicitud.origen
+    destino_id = solicitud.destino.id if hasattr(solicitud.destino, "id") else solicitud.destino
+    origen = db.area(origen_id)
+    if not origen or origen.nivel != 7 or not origen.padre or not destino_id:
+        return False
+    return destino_id == origen.padre
+
+
 def solicitudes_recibidas():
 
     db = current.db

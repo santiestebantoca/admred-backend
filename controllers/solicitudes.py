@@ -7,6 +7,8 @@ def solicitudes():
     @auth.requires_login()  # it uses auth.user
     def GET(id=None, **vars):
         if id:
+            from applications.admred.modules.db.solicitudes import requiere_actividad
+
             fds = [
                 db.solicitud.id,
                 db.solicitud.codigo,
@@ -38,6 +40,7 @@ def solicitudes():
                 db.solicitudes.destino_id,
             ]
             res = db(db.solicitud.id == id).select(*fds).first()
+            requiere = requiere_actividad(res)
             # Validate.get(solicitud=res)
             res.padre = db(db.solicitudes.id == res.padre).select(*fds_).first()
             res.hijos = db(db.solicitudes.padre_id == id).select(*fds_).as_list()
@@ -97,6 +100,15 @@ def solicitudes():
                     )
                 )
             }
+            # Clasificación territorial: solo el supervisor del área destino,
+            # en estado 1 o 2 y antes de la primera escritura.
+            res.requiere_actividad = requiere
+            res.puede_definir_actividad = (
+                requiere
+                and not res.actividad
+                and esSupervisorAreaDemandada
+                and res.estado.id in (1, 2)
+            )
             return response.json(res)
         
         from applications.admred.modules.db.solicitudes import solicitudes
@@ -105,14 +117,51 @@ def solicitudes():
 
     @auth.requires_login()
     def PUT(id, **vars):  # asignar, responder, aprobar and evaluar
+        from applications.admred.modules.db.solicitudes import requiere_actividad
+
         solicitud_id = int(id)
         adjuntos = vars.pop("adjuntos", [])
         q = db.solicitud.id == solicitud_id
+        if "actividad" in vars:
+            solicitud = db.solicitud(solicitud_id)
+            if not solicitud:
+                raise HTTP(404, "Not Found", **headers)
+            if not (
+                auth.has_membership("supervisor")
+                and auth.user.area == solicitud.destino
+            ):
+                raise HTTP(403, "Forbidden", **headers)
+            if not requiere_actividad(solicitud):
+                response.status = 422
+                return response.json(
+                    {"actividad": ["La solicitud no requiere actividad."]}
+                )
+            if solicitud.estado not in (1, 2):
+                response.status = 422
+                return response.json(
+                    {"actividad": ["La actividad solo puede definirse en estado 1 o 2."]}
+                )
+            if solicitud.actividad:
+                response.status = 422
+                return response.json(
+                    {"actividad": ["La actividad ya está definida."]}
+                )
+            res = db(q).validate_and_update(actividad=vars["actividad"])
+            if res.errors:
+                response.status = 422
+                return response.json(res.errors)
+            return response.json(res.updated)
         if "tramitador" in vars:
+            solicitud = db.solicitud(solicitud_id)
             Validate.assign(
                 tramitador=db.auth_user(int(vars["tramitador"])),
-                solicitud=db.solicitud(solicitud_id),
+                solicitud=solicitud,
             )
+            if requiere_actividad(solicitud) and not solicitud.actividad:
+                response.status = 422
+                return response.json(
+                    {"actividad": ["Debe definir la actividad antes de asignar la solicitud."]}
+                )
             response.callback = "assign"
             vars["supervisor"] = auth.user_id
             vars["tramitador_en"] = request.now
@@ -176,12 +225,25 @@ def solicitudes():
         system: codigo, solicitado_en, origen, remitente, estado,
                 (if forward) [Kevin rule] supervisor, tramitador, tramitador_en, estado
         """
-        from applications.admred.modules.db.solicitudes import codigo, add_adjuntos
+        from applications.admred.modules.db.solicitudes import (
+            codigo,
+            add_adjuntos,
+            requiere_actividad,
+        )
 
         if vars.get("cumplir_en", None):
             from datetime import datetime
 
             vars["cumplir_en"] = datetime.strptime(vars["cumplir_en"], "%Y-%m-%d")
+
+        # El reenvío exige la actividad antes de crear la solicitud hija.
+        if vars.get("padre"):
+            padre = db.solicitud(int(vars["padre"]))
+            if padre and requiere_actividad(padre) and not padre.actividad:
+                response.status = 422
+                return response.json(
+                    {"actividad": ["Debe definir la actividad antes de reenviar la solicitud."]}
+                )
 
         adjuntos = vars.pop("adjuntos", [])
 

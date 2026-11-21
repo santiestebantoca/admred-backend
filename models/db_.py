@@ -61,7 +61,7 @@ tabla('solicitud',
       Field('codigo', unique=True, length=9),
       Field('solicitado_en', 'datetime'),
       Field('tipo', 'reference tipo'),
-      Field('actividad', requires=IS_IN_SET(['PROV', 'ADMIN'])),  # Discriminador para niveles territoriales
+      Field('actividad', requires=IS_EMPTY_OR(IS_IN_SET(['PROV', 'ADMIN']))),  # Discriminador para niveles territoriales
       Field('objetivo', 'text'),
       # Documento de entrada
       Field('origen', 'reference area'),
