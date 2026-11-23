@@ -2,6 +2,61 @@
 __author__ = 'jorge.santiesteban'
 
 
+def _es_admin_no_ar():
+    """
+    Administrador autenticado cuya área no tiene rol AR.
+    """
+    if not auth.user or not auth.has_membership('administrador'):
+        return False
+    area = db.area(auth.user.area)
+    return bool(area) and area.rol_key != 'AR'
+
+
+def _ids_subarbol(area_id):
+    """
+    Ids del área indicada y de todos sus descendientes.
+    """
+    if not area_id:
+        return set()
+    filas = db(db.area.id > 0).select(db.area.id, db.area.padre)
+    hijas = {}
+    for fila in filas:
+        hijas.setdefault(fila.padre, []).append(fila.id)
+    ids = set()
+    pendientes = [area_id]
+    while pendientes:
+        actual = pendientes.pop()
+        if actual in ids:
+            continue
+        ids.add(actual)
+        pendientes.extend(hijas.get(actual, []))
+    return ids
+
+
+def _en_ambito(usuario):
+    """
+    Usuario dentro del ámbito del administrador no AR: su subárbol o un
+    usuario sin área creado por él. AR no se acota.
+    """
+    if not _es_admin_no_ar():
+        return True
+    if not usuario:
+        return False
+    if usuario.area in _ids_subarbol(auth.user.area):
+        return True
+    return usuario.area is None and usuario.created_by == auth.user_id
+
+
+def _usuarios_del_ambito():
+    """
+    Query de `vw_usuario` con los usuarios visibles para el administrador no AR.
+    """
+    ids = list(_ids_subarbol(auth.user.area))
+    q = db.vw_usuario.area_id.belongs(ids)
+    q |= (db.vw_usuario.area_id == None) & (db.vw_usuario.created_by == auth.user_id)
+    return q
+
+
 @request.restful()
 def usuarios():
     
@@ -18,6 +73,13 @@ def usuarios():
         limit=None
     ):
         if id:
+            id = int(id)
+            usuario_scope = db.auth_user(id)
+            if not usuario_scope:
+                raise HTTP(404, 'Usuario no encontrado.', **headers)
+            if not _en_ambito(usuario_scope):
+                raise HTTP(403, 'Forbidden.', **headers)
+
             grupos_ids = db(db.auth_membership.user_id == id)._select(db.auth_membership.group_id)
             usuario_en_solicitud = db.solicitud.tramitador == id
             usuario_en_solicitud |= db.solicitud.remitente == id
@@ -40,8 +102,10 @@ def usuarios():
             usuario.area = db.area(usuario.area)
             usuario.grupos = db(db.auth_group.id.belongs(grupos_ids)).select().as_list()
             usuario.modified_by = usuario.modified_by and db.vw_usuario(usuario.modified_by).name
+            actividad = bool(db(usuario_en_solicitud).count())
             usuario.permisos = {
-                "eliminar": not bool(db(usuario_en_solicitud).count())
+                "editar_username": not actividad,
+                "eliminar": not actividad and id != auth.user_id,
             }
             return response.json(usuario)
         
@@ -49,7 +113,7 @@ def usuarios():
         returns::
         (admin): all rows from `usuario`
         (admin no AR): rows from `usuario` where
-            (`usuario` with same `area` as auth.user) or \
+            (`usuario` is in the subtree of auth.user's area) or \
             ((`usuario` has no area) and (`usuario` is created by auth.user))
         """
         
@@ -61,6 +125,8 @@ def usuarios():
             db.vw_usuario.name,
             db.vw_usuario.username,
             db.vw_usuario.registration_key,
+            db.vw_usuario.area,
+            db.vw_usuario.area_id,
         ]
         args = dict(distinct=True, orderby=~db.vw_usuario.id)
         q = db.vw_usuario.id > 0
@@ -85,9 +151,8 @@ def usuarios():
                     qor = db.vw_usuario[field].contains(search)
             q &= qor
         # administrador no AR::
-        if db.area(auth.user.area).rol_key != 'AR':
-            q &= db.vw_usuario.area_id == auth.user.area
-            q |= (db.vw_usuario.area_id == None) & (db.vw_usuario.created_by == auth.user_id)
+        if _es_admin_no_ar():
+            q &= _usuarios_del_ambito()
         # return::
         if page and limit:
             _page = int(page)
@@ -125,15 +190,22 @@ def usuarios():
         Reglas:
         1. Se disabilita la validación de `password` (No viene en vars).
         2. Se establecen `registration_key`, `reset_password_key`, `registration_id` en None (NULL).
-        3. Se establece `area` en la del usuario autenticado si este no es AR.
+        3. Se valida que `area` pertenezca al subárbol del administrador no AR; si falta, se usa la propia.
         """
         db.auth_user.password.requires = None
         db.auth_user.email.requires = None
         db.auth_user.registration_key.default = None
         db.auth_user.reset_password_key.default = None
         db.auth_user.registration_id.default = None        
-        if db.area(auth.user.area).rol_key != 'AR':
-            vars['area'] = auth.user.area
+        if _es_admin_no_ar():
+            area_id = vars.get('area') or auth.user.area
+            try:
+                area_id = int(area_id)
+            except (TypeError, ValueError):
+                raise HTTP(422, 'Área no válida.', **headers)
+            if area_id not in _ids_subarbol(auth.user.area):
+                raise HTTP(403, 'Forbidden.', **headers)
+            vars['area'] = area_id
         res = db.auth_user.validate_and_insert(**vars)
         if (res.errors):
             response.status = 422
@@ -152,9 +224,10 @@ def usuarios():
         Reglas:
         1. Se disabilita la validación de `email` (No viene en vars).
         2. Se validan `email` y `username` no vacíos y no tomados.
-        3. Se elimina `area` si el usuario autenticado no es AR (No puede cambiarla).
+        3. El no AR solo puede mover el usuario dentro de su subárbol; el área del propio usuario se conserva.
         4. Se elimina `username` si el usuario tiene actividad auditable.
         """                
+        id = int(id)
         otros_usuarios = db(db.auth_user.id != id)
         db.auth_user.username.requires = [
             IS_NOT_EMPTY(),
@@ -164,8 +237,22 @@ def usuarios():
             IS_NOT_EMPTY(),
             IS_NOT_IN_DB(otros_usuarios, "auth_user.email")
         ]
-        if db.area(auth.user.area).rol_key != "AR":
-            del vars['area']
+        if _es_admin_no_ar():
+            if id == auth.user_id:
+                # El propio usuario conserva siempre su área.
+                vars.pop('area', None)
+            else:
+                area_id = vars.get('area')
+                if area_id in (None, ''):
+                    vars.pop('area', None)
+                else:
+                    try:
+                        area_id = int(area_id)
+                    except (TypeError, ValueError):
+                        raise HTTP(422, 'Área no válida.', **headers)
+                    if area_id not in _ids_subarbol(auth.user.area):
+                        raise HTTP(403, 'Forbidden.', **headers)
+                    vars['area'] = area_id
         # Permitir editar `username`
         usuario_en_solicitud = db.solicitud.tramitador == id
         usuario_en_solicitud |= db.solicitud.remitente == id
@@ -185,6 +272,7 @@ def usuarios():
           
     @auth.requires_membership('administrador')
     @Validate.user_in_scope
+    @Validate.user_not_self
     @Validate.user_not_referenced
     def DELETE(id):
         res = db(db.auth_user.id == id).delete()
@@ -222,13 +310,24 @@ class Validate:
     @staticmethod
     def user_in_scope(fn):
         """
-        Administrador is from the "AR" area or shares the same area as the updated user.
+        Administrador AR o usuario dentro del ámbito del administrador no AR.
         """
         def run(*k, **kw):
-            id = k[0]
-            c = db.area(auth.user.area).rol_key == 'AR'
-            c |= db.auth_user(id).area in [auth.user.area, None]  # None, permite usuarios sin area 
-            if not c:
+            id = int(k[0] if k else kw.get('id'))
+            if not _en_ambito(db.auth_user(id)):
+                raise HTTP(403, 'Forbidden.', **headers)
+            return fn(*k, **kw)
+
+        return run
+
+    @staticmethod
+    def user_not_self(fn):
+        """
+        Un administrador no puede borrar su propio usuario.
+        """
+        def run(*k, **kw):
+            id = int(k[0] if k else kw.get('id'))
+            if id == auth.user_id:
                 raise HTTP(403, 'Forbidden.', **headers)
             return fn(*k, **kw)
 
