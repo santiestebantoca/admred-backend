@@ -8,12 +8,12 @@ def areas():
         """
         Para formularios.
         Quita/pone un "área padre" según la lógica de negocio (esquema de niveles):
-        - Niveles 1 y 4 son root, no tienen nivel padre, por tanto no tienen área padre.
+        - Niveles 1, 4 y 6 son root, no tienen nivel padre, por tanto no tienen área padre.
         - El nivel 2 tiene al nivel 1 de padre, este último con una única área, VPOR.
-        TODO: No tiene incorporada la lógica de los territorios, niveles 5 y 6.
+        - El nivel 5 puede colgar de un área de nivel 4 o de otra de nivel 5.
         """
         
-        if vars['nivel'] in ['1', '4']:
+        if vars['nivel'] in ['1', '4', '6']:
             vars['padre'] = None
         elif vars['nivel'] == '2':
             vars['padre'] = 1
@@ -44,6 +44,8 @@ def areas():
             db.areas.padre,
             db.areas.nivel,
             db.areas.rol_key,
+            db.areas.padre_id,
+            db.areas.nivel_id,
         ]
         args = dict(distinct=True, orderby=~db.areas.id)
         q = db.areas.id > 0
