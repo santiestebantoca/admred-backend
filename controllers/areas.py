@@ -2,6 +2,80 @@
 __author__ = 'jorge.santiesteban'
 
 
+def _es_admin_no_ar():
+    """
+    Administrador autenticado cuya área no tiene rol AR.
+    """
+    if not auth.user or not auth.has_membership('administrador'):
+        return False
+    area = db.area(auth.user.area)
+    return bool(area) and area.rol_key != 'AR'
+
+
+def _ids_subarbol(area_id):
+    """
+    Ids del área indicada y de todos sus descendientes.
+
+    Incluye el propio id y usa un conjunto de visitados para no entrar en un
+    bucle si los datos trajeran un ciclo.
+    """
+    if not area_id:
+        return set()
+    filas = db(db.area.id > 0).select(db.area.id, db.area.padre)
+    hijas = {}
+    for fila in filas:
+        hijas.setdefault(fila.padre, []).append(fila.id)
+    ids = set()
+    pendientes = [area_id]
+    while pendientes:
+        actual = pendientes.pop()
+        if actual in ids:
+            continue
+        ids.add(actual)
+        pendientes.extend(hijas.get(actual, []))
+    return ids
+
+
+def _nivel_hijo(nivel_id):
+    """
+    Nivel que corresponde a las hijas de un nivel.
+
+    El nivel 5 es autorrecursivo; el resto sigue el `padre_id` del catálogo.
+    """
+    if not nivel_id:
+        return None
+    if nivel_id == 5:
+        return 5
+    fila = db(db.nivel.padre_id == nivel_id).select(
+        db.nivel.id, limitby=(0, 1)).first()
+    return fila.id if fila else None
+
+
+def _alta_no_ar(vars):
+    """
+    Ajusta el alta del administrador no AR: padre del subárbol y nivel derivado.
+
+    Solo se aceptan los campos propios del alta; en particular se descartan
+    `rol_key` e `is_active`, que no puede fijar un administrador no AR.
+    """
+    padre_id = vars.get('padre') or auth.user.area
+    try:
+        padre_id = int(padre_id)
+    except (TypeError, ValueError):
+        raise HTTP(422, 'Área padre no válida.', **headers)
+    if padre_id not in _ids_subarbol(auth.user.area):
+        raise HTTP(403, 'Forbidden.', **headers)
+    padre_area = db.area(padre_id)
+    nivel_id = _nivel_hijo(padre_area.nivel) if padre_area else None
+    if not nivel_id:
+        raise HTTP(422, 'El área padre no admite áreas hijas.', **headers)
+    return {
+        'nombre': vars.get('nombre'),
+        'padre': padre_id,
+        'nivel': nivel_id,
+    }
+
+
 @request.restful()
 def areas():
     def padre(vars):
@@ -21,6 +95,12 @@ def areas():
 
     def GET(id=None, search=None, search_in=None, nombre=None, padre=None, nivel=None, rol_key=None, page=None, limit=None):
         if id:
+            id = int(id)
+            no_ar = _es_admin_no_ar()
+            ambito = _ids_subarbol(auth.user.area) if no_ar else set()
+            if no_ar and id not in ambito:
+                raise HTTP(403, 'Forbidden.', **headers)
+
             area_en_solicitud = db.solicitud.origen == id
             area_en_solicitud |= db.solicitud.destino == id
             area_en_usuario = db.auth_user.area == id
@@ -30,8 +110,14 @@ def areas():
             area.padre = db.area(area.padre)
             area.modified_by = area.modified_by and db.vw_usuario(area.modified_by).name
             area.permisos = {
+                "editar": bool(
+                    auth.user
+                    and auth.has_membership('administrador')
+                    and (not no_ar or (id in ambito and id != auth.user.area))
+                ),
                 "eliminar": (
                     not bool(db(area_en_solicitud).count() + db(area_en_usuario).count())
+                    and not (no_ar and id == auth.user.area)
                 )
             }
             return response.json(area)
@@ -49,6 +135,8 @@ def areas():
         ]
         args = dict(distinct=True, orderby=~db.areas.id)
         q = db.areas.id > 0
+        if _es_admin_no_ar():
+            q &= db.areas.id.belongs(list(_ids_subarbol(auth.user.area)))
         if nombre:
             q &= db.areas.nombre.contains(nombre)
         if nivel:
@@ -94,9 +182,11 @@ def areas():
         }) 
 
     @auth.requires_membership('administrador')
-    @Validate.auth_from_AR
     def POST(**vars):
-        vars = padre(vars)
+        if _es_admin_no_ar():
+            vars = _alta_no_ar(vars)
+        else:
+            vars = padre(vars)
         res = db.area.validate_and_insert(**vars)
         if (res.errors):
             response.status = 422
@@ -104,9 +194,14 @@ def areas():
         return response.json(res)
 
     @auth.requires_membership('administrador')
-    @Validate.auth_from_AR
+    @Validate.area_in_scope
     def PUT(id, **vars):
-        vars = padre(vars)
+        if _es_admin_no_ar():
+            # El no AR solo puede cambiar el nombre: no mueve el área, no
+            # cambia su nivel y no puede fijar `rol_key` ni `is_active`.
+            vars = {k: vars[k] for k in ('nombre',) if k in vars}
+        else:
+            vars = padre(vars)
         res = db(db.area.id == id).validate_and_update(**vars)        
         if (res.errors):
             response.status = 422
@@ -114,7 +209,7 @@ def areas():
         return response.json(res)
 
     @auth.requires_membership('administrador')
-    @Validate.auth_from_AR
+    @Validate.area_in_scope
     @Validate.area_not_referenced
     def DELETE(id, **vars):
         res = db(db.area.id == id).delete()
@@ -133,10 +228,16 @@ class Validate:
     """
 
     @staticmethod
-    def auth_from_AR(fn):
+    def area_in_scope(fn):
+        """
+        El administrador no AR solo opera sobre el subárbol de su área y nunca
+        sobre su propia área.
+        """
         def run(*k, **kw):
-            if not db.area(auth.user.area).rol_key == 'AR':
-                raise HTTP(403, 'Forbidden.', **headers)
+            if _es_admin_no_ar():
+                id = int(k[0] if k else kw.get('id'))
+                if id == auth.user.area or id not in _ids_subarbol(auth.user.area):
+                    raise HTTP(403, 'Forbidden.', **headers)
             return fn(*k, **kw)
 
         return run
